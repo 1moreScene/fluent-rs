@@ -1,0 +1,71 @@
+// While captured, TouchArea continues to receive moves outside its hit area.
+export component FluentPointerArea inherits TouchArea {
+    out property <bool> pointer-inside: self.enabled && self.has-hover
+        && self.mouse-x >= 0px && self.mouse-x < self.width
+        && self.mouse-y >= 0px && self.mouse-y < self.height;
+    out property <bool> pressed-inside: self.pressed && self.pointer-inside;
+}
+
+export enum ButtonState { normal, pointer-over, pressed, disabled }
+
+export component FluentPressable inherits FocusScope {
+    in property <bool> accepts-enter: true;
+    in property <bool> focus-on-press;
+    out property <bool> hovered: pointer.pointer-inside;
+    out property <bool> pressed: self.enabled && (active-key != "" || pointer.pressed-inside);
+    out property <bool> focus-visible: self.enabled && self.has-focus && keyboard-focus;
+    out property <ButtonState> state: !self.enabled ? ButtonState.disabled
+        : self.pressed ? ButtonState.pressed
+        : self.hovered ? ButtonState.pointer-over : ButtonState.normal;
+    callback activated;
+
+    property <string> active-key;
+    property <bool> keyboard-focus;
+
+    focus-gained(reason) => {
+        if (reason != FocusReason.window-activation) {
+            root.keyboard-focus = reason != FocusReason.pointer-click;
+        }
+    }
+    focus-lost(reason) => {
+        root.active-key = "";
+        if (reason != FocusReason.window-activation) { root.keyboard-focus = false; }
+    }
+    changed enabled => {
+        if (!root.enabled) { root.active-key = ""; }
+    }
+
+    key-pressed(event) => {
+        if (root.enabled && (event.text == " " || (root.accepts-enter && event.text == Key.Return))) {
+            root.keyboard-focus = true;
+            if (root.active-key == "" && !event.repeat && !pointer.pressed) {
+                root.active-key = event.text;
+            }
+            return accept;
+        }
+        return reject;
+    }
+    key-released(event) => {
+        if (root.active-key != "" && event.text == root.active-key) {
+            root.active-key = "";
+            if (root.enabled && !pointer.pressed) { root.activated(); }
+            return accept;
+        }
+        return reject;
+    }
+
+    @children
+
+    pointer := FluentPointerArea {
+        width: 100%;
+        height: 100%;
+        enabled: root.enabled;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                if (root.focus-on-press) { root.focus(); }
+                root.keyboard-focus = false;
+            }
+        }
+        clicked => { if (root.enabled && root.active-key == "") { root.activated(); } }
+    }
+}

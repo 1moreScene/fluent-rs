@@ -1,0 +1,104 @@
+import { FluentMotion } from "motion.slint";
+import { FluentRange } from "range.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export enum ProgressBarStatus { normal, paused, error }
+
+export component ProgressBar {
+    in property <float> minimum: 0;
+    in property <float> maximum: 100;
+    in property <float> value: minimum;
+    in property <bool> indeterminate;
+    in property <ProgressBarStatus> status;
+    // Bind to the host's foreground/visibility state when it manages a page or window.
+    in property <bool> animations-enabled: true;
+
+    property <bool> motion: animations-enabled && self.visible && FluentMotion.enabled;
+    property <bool> sweeping: motion && indeterminate && status == ProgressBarStatus.normal;
+    property <float> progress: FluentRange.fraction(minimum, maximum, value);
+    property <float> indicator-fraction: !indeterminate ? progress
+        : status == ProgressBarStatus.normal ? 0.4 : 1;
+    property <color> indicator-color: status == ProgressBarStatus.error
+        ? FluentTheme.high-contrast ? FluentTheme.contrast-hotlight : FluentTheme.system-critical
+        : status == ProgressBarStatus.paused
+            ? FluentTheme.high-contrast ? FluentTheme.contrast-text : FluentTheme.system-caution
+            : FluentTheme.high-contrast ? FluentTheme.contrast-highlight : FluentTheme.accent-fill;
+    property <length> stroke: FluentTheme.high-contrast ? FluentMetrics.control-stroke : 0px;
+
+    min-height: FluentMetrics.progress-bar-size + 2 * stroke;
+    preferred-height: self.min-height;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+
+    accessible-role: progress-indicator;
+    accessible-value: root.indeterminate ? "" : clamp(root.value, root.minimum, max(root.minimum, root.maximum));
+    accessible-value-minimum: root.minimum;
+    accessible-value-maximum: max(root.minimum, root.maximum);
+    accessible-description: root.status == ProgressBarStatus.error ? "Error"
+        : root.status == ProgressBarStatus.paused ? "Paused" : root.indeterminate ? "In progress" : "";
+
+    animate indicator-fraction {
+        enabled: root.motion && !root.indeterminate;
+        duration: FluentMotion.control-fast-duration;
+        easing: FluentMotion.control-fast-out-slow-in;
+    }
+    animate indicator-color {
+        enabled: root.motion;
+        duration: FluentMotion.control-fast-duration;
+        easing: linear;
+    }
+
+    Rectangle {
+        width: 100%;
+        height: root.min-height;
+        border-radius: self.height / 2;
+        border-width: root.stroke;
+        border-color: FluentTheme.contrast-text;
+        background: FluentTheme.high-contrast ? FluentTheme.contrast-surface : transparent;
+
+        Rectangle {
+            width: max(0px, parent.width - 2 * root.stroke);
+            height: FluentMetrics.progress-bar-size;
+            clip: true;
+
+            Rectangle {
+                width: 100%;
+                height: FluentMetrics.progress-bar-track-size;
+                border-radius: self.height / 2;
+                background: FluentTheme.high-contrast ? FluentTheme.contrast-surface : FluentTheme.control-strong-stroke;
+            }
+
+            if !root.sweeping : Rectangle {
+                x: root.indeterminate ? (parent.width - self.width) / 2 : 0px;
+                width: parent.width * root.indicator-fraction;
+                height: 100%;
+                border-radius: self.height / 2;
+                background: root.indicator-color;
+            }
+
+            if root.sweeping : Rectangle {
+                property <duration> phase: mod(animation-tick(), FluentMotion.progress-cycle);
+                width: 100%;
+                height: 100%;
+
+                Rectangle {
+                    property <float> t: clamp(parent.phase / FluentMotion.progress-bar-first-sweep, 0, 1);
+                    x: parent.width * (-0.4 + 1.6 * FluentMotion.progress-bar-ease(t));
+                    width: parent.width * 0.4;
+                    height: 100%;
+                    border-radius: self.height / 2;
+                    background: root.indicator-color;
+                }
+                Rectangle {
+                    property <duration> delay: FluentMotion.progress-bar-second-delay;
+                    property <float> t: clamp((parent.phase - delay) / (FluentMotion.progress-cycle - delay), 0, 1);
+                    x: parent.width * (-0.9 + 1.896 * FluentMotion.progress-bar-ease(t));
+                    width: parent.width * 0.6;
+                    height: 100%;
+                    border-radius: self.height / 2;
+                    background: root.indicator-color;
+                }
+            }
+        }
+    }
+}

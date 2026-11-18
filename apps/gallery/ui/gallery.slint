@@ -1,0 +1,226 @@
+import { Button, ButtonState, ButtonVariant } from "../../../ui/button.slint";
+import { TextBoxState } from "../../../ui/text-box.slint";
+import { FluentColorScheme, FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+import { FluentMaterial, FluentMaterials } from "../../../ui/material.slint";
+import { FluentMotion } from "../../../ui/motion.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { ButtonPage } from "button-page.slint";
+import { Caption } from "caption.slint";
+import { AppearanceAction, FoundationsPage } from "foundations-page.slint";
+import { TextBoxPage } from "text-box-page.slint";
+import { ToggleProbe, TogglesPage } from "toggles-page.slint";
+import { ToggleValue } from "../../../ui/toggle.slint";
+import { RadioPage } from "radio-page.slint";
+import { RangePage, RangeBounds } from "range-page.slint";
+import { ProgressBarStatus } from "../../../ui/progress-bar.slint";
+import { RadioDirection, RadioItem, RadioNavigation } from "../../../ui/radio-group.slint";
+export { AppearanceAction, ButtonState, FluentColorScheme, FluentMaterial, FluentTheme, TextBoxState, ToggleValue }
+export { RadioDirection, RadioItem, RadioNavigation }
+export { ProgressBarStatus, RangeBounds }
+
+export enum GalleryPage { button, text-box, foundations, toggles, radios, ranges }
+
+export component GalleryWindow inherits Window {
+    title: "Fluent RS Gallery";
+    preferred-width: 720px;
+    preferred-height: 620px;
+    default-font-family: root.font-family;
+    default-font-size: FluentMetrics.scaled-font-size;
+    background: root.native-desktop-acrylic && !FluentTheme.high-contrast
+        ? transparent : FluentMaterials.fallback-color(root.backdrop);
+
+    in property <bool> touch-targets;
+    in property <string> font-family;
+    in-out property <GalleryPage> page;
+    in property <FluentMaterial> backdrop;
+    in property <bool> native-desktop-acrylic;
+    in property <bool> alternate-accent;
+    callback select-theme(FluentColorScheme);
+    callback select-backdrop(FluentMaterial);
+    callback change-appearance(AppearanceAction);
+    out property <bool> motion-enabled: FluentMotion.enabled;
+    in property <bool> range-animations-enabled: true;
+    in-out property <bool> slider-enabled <=> ranges.slider-enabled;
+    in-out property <bool> slider-snap-to-ticks <=> ranges.slider-snap-to-ticks;
+    in-out property <bool> slider-reversed <=> ranges.slider-reversed;
+    in-out property <float> slider-maximum <=> ranges.slider-maximum;
+    in-out property <float> slider-value <=> ranges.value;
+    in-out property <float> vertical-slider-value <=> ranges.vertical-value;
+    in-out property <bool> progress-indeterminate <=> ranges.indeterminate;
+    in-out property <bool> progress-ring-active <=> ranges.ring-active;
+    in-out property <ProgressBarStatus> progress-bar-status <=> ranges.status;
+    out property <int> slider-edits: ranges.edits;
+    out property <ButtonState> slider-state: ranges.slider-state;
+    out property <bool> slider-focus-visible: ranges.slider-focus-visible;
+    out property <RangeBounds> slider-bounds: ranges.slider-bounds;
+    out property <RangeBounds> vertical-slider-bounds: ranges.vertical-bounds;
+    out property <RangeBounds> progress-bar-bounds: ranges.bar-bounds;
+    out property <RangeBounds> progress-ring-bounds: ranges.ring-bounds;
+    out property <Point> motion-button-center: foundations.motion-button-center;
+    in-out property <bool> preview-acrylic <=> foundations.preview-acrylic;
+    out property <Point> acrylic-sample: foundations.acrylic-sample;
+    out property <Point> acrylic-seam: foundations.acrylic-seam;
+    in-out property <bool> toggles-enabled <=> toggles.examples-enabled;
+    in-out property <bool> toggles-three-state <=> toggles.three-state;
+    in-out property <ToggleValue> toggle-button-value <=> toggles.toggle-value;
+    in-out property <ToggleValue> check-box-value <=> toggles.check-value;
+    in property <string> check-box-label: "CheckBox";
+    out property <int> toggle-button-activations: toggles.toggle-activations;
+    out property <int> check-box-activations: toggles.check-activations;
+    out property <ToggleProbe> toggle-button-probe: toggles.toggle-probe;
+    out property <ToggleProbe> check-box-probe: toggles.check-probe;
+    in-out property <bool> examples-enabled <=> buttons.examples-enabled;
+    out property <int> activation-count: buttons.activation-count;
+    out property <ButtonState> example-state: buttons.example-state;
+    out property <bool> example-focus-visible: buttons.example-focus-visible;
+    out property <length> example-x: buttons.example-x;
+    out property <length> example-y: buttons.example-y;
+    out property <length> example-height: buttons.example-height;
+    out property <length> examples-right: buttons.examples-right;
+
+    in-out property <bool> text-box-enabled <=> text-boxes.editing-enabled;
+    in-out property <string> text-box-text <=> text-boxes.editable-text;
+    out property <TextBoxState> text-box-state: text-boxes.editable-state;
+    out property <bool> text-box-selection: text-boxes.editable-selection;
+    out property <bool> text-box-clear-visible: text-boxes.editable-clear-visible;
+    out property <bool> other-clear-visible: text-boxes.other-clear-visible;
+    out property <int> text-box-edits: text-boxes.edits;
+    out property <int> text-box-submissions: text-boxes.submissions;
+    out property <length> text-box-x: text-boxes.editable-x;
+    out property <length> text-box-y: text-boxes.editable-y;
+    out property <length> text-box-bottom: text-boxes.editable-bottom;
+    out property <length> text-box-right: text-boxes.editable-right;
+    out property <length> read-only-x: text-boxes.read-only-x;
+    out property <length> read-only-y: text-boxes.read-only-y;
+    out property <TextBoxState> read-only-state: text-boxes.read-only-state;
+    out property <string> read-only-text: text-boxes.read-only-text;
+    out property <bool> read-only-selection: text-boxes.read-only-selection;
+    out property <length> multi-line-x: text-boxes.multi-line-x;
+    out property <length> multi-line-y: text-boxes.multi-line-y;
+    out property <string> multi-line-text: text-boxes.multi-line-text;
+
+    in property <int> radio-max-columns: 3;
+    in-out property <int> profile-selection <=> radios.profile-selection;
+    in-out property <int> quality-selection <=> radios.quality-selection;
+    out property <int> profile-focus: radios.profile-focus;
+    out property <int> quality-focus: radios.quality-focus;
+    out property <int> profile-columns: radios.profile-columns;
+    out property <int> profile-changes: radios.profile-changes;
+    out property <Point> profile-origin: radios.profile-origin;
+    out property <Point> quality-origin: radios.quality-origin;
+    out property <bool> standalone-radio-checked: radios.standalone-checked;
+    out property <ButtonState> standalone-radio-state: radios.standalone-state;
+    out property <Point> standalone-radio-center: radios.standalone-center;
+    out property <length> standalone-radio-height: radios.standalone-height;
+
+    property <length> content-width: max(0px, root.width - root.safe-area-insets.left - root.safe-area-insets.right);
+    property <length> page-padding: content-width < FluentMetrics.compact-width ? FluentMetrics.spacing-large : FluentMetrics.spacing-page;
+    property <length> target-size: touch-targets ? FluentMetrics.touch-target : 0px;
+
+    VerticalLayout {
+        x: root.safe-area-insets.left;
+        y: root.safe-area-insets.top;
+        width: root.content-width;
+        height: max(0px, parent.height - root.safe-area-insets.top - root.safe-area-insets.bottom);
+        padding: root.page-padding;
+        spacing: FluentMetrics.spacing-large;
+
+        VerticalLayout {
+            spacing: FluentMetrics.spacing-small;
+            Caption { text: "Fluent RS Gallery"; }
+            FluentText {
+                text: root.page == GalleryPage.button ? "Button"
+                    : root.page == GalleryPage.text-box ? "TextBox"
+                    : root.page == GalleryPage.toggles ? "ToggleButton and CheckBox"
+                    : root.page == GalleryPage.radios ? "RadioButton and RadioGroup"
+                    : root.page == GalleryPage.ranges ? "Slider and Progress" : "Foundations";
+                font-size: FluentMetrics.title-size;
+                font-weight: FluentMetrics.strong-weight;
+                wrap: word-wrap;
+            }
+        }
+
+        FlexboxLayout {
+            spacing: FluentMetrics.spacing-medium;
+            alignment: start;
+            for option in [
+                { title: "Button", page: GalleryPage.button },
+                { title: "TextBox", page: GalleryPage.text-box },
+                { title: "Toggles", page: GalleryPage.toggles },
+                { title: "Radio", page: GalleryPage.radios },
+                { title: "Range", page: GalleryPage.ranges },
+                { title: "Foundations", page: GalleryPage.foundations },
+            ] : Button {
+                text: option.title;
+                minimum-target: root.target-size;
+                variant: root.page == option.page ? ButtonVariant.accent : ButtonVariant.standard;
+                accessible-description: root.page == option.page ? "Current page" : "Open examples";
+                clicked => { root.page = option.page; }
+            }
+        }
+
+        FlexboxLayout {
+            spacing: FluentMetrics.spacing-medium;
+            alignment: start;
+            for option in [
+                { title: "Light", scheme: FluentColorScheme.light },
+                { title: "Dark", scheme: FluentColorScheme.dark },
+                { title: "High contrast", scheme: FluentColorScheme.high-contrast },
+            ] : Button {
+                text: option.title;
+                minimum-target: root.target-size;
+                variant: FluentTheme.scheme == option.scheme ? ButtonVariant.accent : ButtonVariant.standard;
+                accessible-description: FluentTheme.scheme == option.scheme ? "Selected theme" : "Apply theme";
+                clicked => { root.select-theme(option.scheme); }
+            }
+        }
+
+        Rectangle {
+            vertical-stretch: 1;
+            buttons := ButtonPage {
+                width: 100%;
+                height: 100%;
+                visible: root.page == GalleryPage.button;
+                target-size: root.target-size;
+            }
+            text-boxes := TextBoxPage {
+                width: 100%;
+                height: 100%;
+                visible: root.page == GalleryPage.text-box;
+                target-size: root.target-size;
+            }
+            toggles := TogglesPage {
+                width: 100%;
+                height: 100%;
+                visible: root.page == GalleryPage.toggles;
+                target-size: root.target-size;
+                check-label: root.check-box-label;
+            }
+            radios := RadioPage {
+                width: 100%;
+                height: 100%;
+                visible: root.page == GalleryPage.radios;
+                target-size: root.target-size;
+                max-columns: root.radio-max-columns;
+            }
+            ranges := RangePage {
+                width: 100%;
+                height: 100%;
+                visible: root.page == GalleryPage.ranges;
+                animations-enabled: self.visible && !root.minimized && root.range-animations-enabled;
+                target-size: root.target-size;
+            }
+            foundations := FoundationsPage {
+                width: 100%;
+                height: 100%;
+                visible: root.page == GalleryPage.foundations;
+                target-size: root.target-size;
+                alternate-accent: root.alternate-accent;
+                backdrop: root.backdrop;
+                native-desktop-acrylic: root.native-desktop-acrylic;
+                change-appearance(action) => { root.change-appearance(action); }
+                select-backdrop(material) => { root.select-backdrop(material); }
+            }
+        }
+    }
+}

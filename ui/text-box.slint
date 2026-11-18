@@ -1,0 +1,239 @@
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+import { FluentPointerArea } from "interaction.slint";
+import { FluentIcon, FluentSurface, FluentText } from "primitives.slint";
+
+export enum TextBoxState { normal, pointer-over, focused, disabled }
+
+// A project-drawn clear mark shared with the Gallery's focused sample.
+export component TextBoxClearIcon inherits FluentIcon {
+    width: FluentMetrics.text-box-clear-icon-size;
+    height: FluentMetrics.text-box-clear-icon-size;
+    viewbox-width: 12;
+    viewbox-height: 12;
+    commands: "M 2 2 L 10 10 M 10 2 L 2 10";
+    stroke: FluentTheme.text-secondary;
+    stroke-line-cap: round;
+}
+
+// The live control and the Gallery samples use the same chrome.
+export component TextBoxSurface {
+    in property <TextBoxState> state;
+    out property <color> foreground: state == TextBoxState.disabled ? FluentTheme.input-disabled-text : FluentTheme.text-primary;
+    out property <color> placeholder-color: state == TextBoxState.disabled ? FluentTheme.text-disabled : FluentTheme.text-secondary;
+
+    property <bool> focused: state == TextBoxState.focused;
+    property <length> stroke: FluentMetrics.control-stroke;
+    property <length> radius: FluentMetrics.control-radius;
+    out property <length> bottom-stroke: focused ? FluentMetrics.text-box-focus-stroke : stroke;
+    property <float> gradient-start: 100% - 100% * FluentMetrics.text-box-elevation-depth / max(1px, self.height);
+    property <float> gradient-end: 100% - 100% * FluentMetrics.elevation-stop / max(1px, self.height);
+
+    pure function fill() -> color {
+        if (FluentTheme.high-contrast) { return FluentTheme.contrast-surface; }
+        if (state == TextBoxState.disabled) { return FluentTheme.control-fill-disabled; }
+        if (focused) { return FluentTheme.input-active-fill; }
+        return state == TextBoxState.pointer-over ? FluentTheme.control-fill-hover : FluentTheme.control-fill;
+    }
+
+    pure function outline() -> brush {
+        if (FluentTheme.high-contrast) {
+            return state == TextBoxState.disabled ? FluentTheme.contrast-disabled : focused ? FluentTheme.contrast-highlight : FluentTheme.contrast-text;
+        }
+        if (focused || state == TextBoxState.disabled) { return FluentTheme.control-stroke; }
+        return @linear-gradient(180deg, FluentTheme.control-stroke gradient-start, FluentTheme.input-strong-stroke gradient-end);
+    }
+
+    Rectangle {
+        x: root.stroke;
+        y: root.stroke;
+        width: max(0px, root.width - 2 * root.stroke);
+        height: max(0px, root.height - root.stroke - root.bottom-stroke);
+        background: root.fill();
+        border-radius: root.radius - root.stroke;
+    }
+    FluentSurface {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        border-radius: root.radius;
+        border-width: root.focused && FluentTheme.high-contrast ? FluentMetrics.text-box-focus-stroke : root.stroke;
+        border-color: root.outline();
+    }
+    if root.focused && !FluentTheme.high-contrast : Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: root.radius;
+        clip: true;
+        Rectangle {
+            y: parent.height - self.height;
+            width: 100%;
+            height: root.bottom-stroke;
+            background: FluentTheme.accent-fill;
+        }
+    }
+    @children
+}
+
+export component TextBox inherits VerticalLayout {
+    in-out property <string> text <=> editor.text;
+    in property <string> label;
+    in property <string> placeholder-text;
+    in property <string> accessible-name: label == "" ? placeholder-text : label;
+    in property <bool> enabled: true;
+    in property <bool> read-only;
+    in property <bool> multiline;
+    in property <length> minimum-target;
+
+    out property <bool> has-focus: self.enabled && editor.has-focus;
+    out property <bool> has-selection: self.enabled && editor.has-selection;
+    out property <bool> clear-button-visible: self.has-focus && !read-only && !multiline && text != ""
+        && surface.width > max(FluentMetrics.text-box-clear-min-width-em * editor.font-size,
+            surface.height + self.editor-horizontal-insets);
+    out property <TextBoxState> state: !self.enabled ? TextBoxState.disabled
+        : self.has-focus ? TextBoxState.focused
+        : pointer.pointer-inside ? TextBoxState.pointer-over : TextBoxState.normal;
+    callback edited(text: string);
+    callback accepted(text: string);
+    property <length> editor-horizontal-insets: FluentMetrics.text-box-padding-left
+        + FluentMetrics.text-box-padding-right + 2 * FluentMetrics.control-stroke;
+
+    function clear-text() {
+        if (root.clear-button-visible) {
+            root.text = "";
+            editor.set-selection-offsets(0, 0);
+            viewport.scroll-x = 0px;
+            editor.focus();
+            root.edited("");
+        }
+    }
+
+    spacing: FluentMetrics.spacing-medium;
+    forward-focus: editor;
+    min-width: FluentMetrics.text-box-min-width;
+    horizontal-stretch: 1;
+    vertical-stretch: self.multiline ? 1 : 0;
+
+    changed enabled => {
+        if (!root.enabled && editor.has-focus) { editor.clear-focus(); }
+    }
+
+    if root.label != "" : FluentText {
+        text: root.label;
+        color: root.enabled ? FluentTheme.text-primary : FluentTheme.text-disabled;
+        wrap: word-wrap;
+        accessible-role: none;
+    }
+
+    surface := TextBoxSurface {
+        min-height: max(root.minimum-target, FluentMetrics.text-box-min-height,
+            editor.font-metrics.ascent + abs(editor.font-metrics.descent) +
+            FluentMetrics.text-box-padding-top + FluentMetrics.text-box-padding-bottom + 2 * FluentMetrics.control-stroke);
+        vertical-stretch: root.multiline ? 1 : 0;
+        state: root.state;
+
+        pointer := FluentPointerArea {
+            width: 100%;
+            height: 100%;
+            enabled: root.enabled;
+            mouse-cursor: MouseCursor.text;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                    editor.focus();
+                }
+            }
+            scroll-event(event) => {
+                let next = clamp(viewport.scroll-y - event.delta-y, 0px, viewport.vertical-limit);
+                if (!root.multiline || next == viewport.scroll-y) { return reject; }
+                viewport.scroll-y = next;
+                return accept;
+            }
+
+            viewport := Rectangle {
+                clip: true;
+                x: FluentMetrics.text-box-padding-left + FluentMetrics.control-stroke;
+                y: FluentMetrics.text-box-padding-top + FluentMetrics.control-stroke;
+                width: max(1px, parent.width - root.editor-horizontal-insets
+                    - (root.clear-button-visible ? surface.height : 0px));
+                height: max(1px, parent.height - self.y - surface.bottom-stroke - FluentMetrics.text-box-padding-bottom);
+                property <length> scroll-x;
+                property <length> scroll-y;
+                property <length> horizontal-limit: max(0px, editor.width - self.width + FluentMetrics.text-cursor-width);
+                property <length> vertical-limit: max(0px, editor.height - self.height);
+
+                FluentText {
+                    width: 100%;
+                    height: 100%;
+                    text: root.text == "" && editor.preedit-text == "" ? root.placeholder-text : "";
+                    color: surface.placeholder-color;
+                    vertical-alignment: root.multiline ? top : center;
+                    wrap: root.multiline ? word-wrap : no-wrap;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+
+                editor := TextInput {
+                    x: root.multiline ? 0px : -min(viewport.scroll-x, viewport.horizontal-limit);
+                    y: -min(viewport.scroll-y, viewport.vertical-limit);
+                    width: root.multiline ? viewport.width : max(viewport.width, self.preferred-width);
+                    height: root.multiline ? max(viewport.height, self.preferred-height) : viewport.height;
+                    page-height: viewport.height;
+                    vertical-alignment: root.multiline ? top : center;
+                    single-line: !root.multiline;
+                    wrap: root.multiline ? word-wrap : no-wrap;
+                    enabled: root.enabled;
+                    read-only: root.read-only;
+                    font-size: FluentMetrics.body-size;
+                    font-weight: FluentMetrics.regular-weight;
+                    color: surface.foreground;
+                    selection-background-color: FluentTheme.high-contrast ? FluentTheme.contrast-highlight : FluentTheme.accent-fill;
+                    selection-foreground-color: FluentTheme.high-contrast ? FluentTheme.contrast-highlight-text : FluentTheme.accent-text;
+                    text-cursor-width: FluentMetrics.text-cursor-width;
+                    accessible-label: root.accessible-name;
+                    accessible-placeholder-text: root.placeholder-text;
+
+                    edited => { root.edited(self.text); }
+                    accepted => { if (!root.read-only) { root.accepted(self.text); } }
+
+                    cursor-position-changed(position) => {
+                        if (root.multiline) {
+                            let line-height = self.font-metrics.ascent + abs(self.font-metrics.descent);
+                            let scroll = min(viewport.scroll-y, viewport.vertical-limit);
+                            viewport.scroll-y = clamp(min(position.y, max(scroll, position.y + line-height - viewport.height)), 0px, viewport.vertical-limit);
+                        } else {
+                            let scroll = min(viewport.scroll-x, viewport.horizontal-limit);
+                            viewport.scroll-x = clamp(min(position.x, max(scroll, position.x + self.text-cursor-width - viewport.width)), 0px, viewport.horizontal-limit);
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.clear-button-visible : clear-button := FluentPointerArea {
+            x: parent.width - self.width;
+            width: parent.height;
+            height: 100%;
+            mouse-cursor: MouseCursor.default;
+            accessible-role: button;
+            accessible-label: @tr("Clear text");
+            accessible-action-default => { root.clear-text(); }
+            clicked => { root.clear-text(); }
+
+            Rectangle {
+                y: FluentMetrics.text-box-clear-inset;
+                width: max(0px, parent.width - FluentMetrics.text-box-clear-inset);
+                height: max(0px, parent.height - 2 * self.y);
+                border-radius: FluentMetrics.control-radius;
+                background: FluentTheme.high-contrast && clear-button.pointer-inside ? FluentTheme.contrast-highlight
+                    : clear-button.pressed-inside ? FluentTheme.subtle-fill-pressed
+                    : clear-button.pointer-inside ? FluentTheme.subtle-fill-hover : #0000;
+
+                TextBoxClearIcon {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    stroke: FluentTheme.high-contrast && clear-button.pointer-inside ? FluentTheme.contrast-highlight-text
+                        : clear-button.pressed-inside ? FluentTheme.text-tertiary : FluentTheme.text-secondary;
+                }
+            }
+        }
+    }
+}

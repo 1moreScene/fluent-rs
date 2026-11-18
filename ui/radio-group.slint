@@ -1,0 +1,115 @@
+import { RadioOption } from "radio-button.slint";
+import { FluentText } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export struct RadioItem { text: string, disabled: bool }
+export enum RadioDirection { first, previous, next, left, right }
+
+// The host supplies navigation over its Slint model.
+export global RadioNavigation {
+    pure callback target([RadioItem], int, int, RadioDirection) -> int;
+}
+
+export component RadioGroup inherits FocusScope {
+    in property <string> title;
+    in property <[RadioItem]> items;
+    in property <int> max-columns: 1;
+    in property <length> minimum-target;
+    in-out property <int> selected-index: -1;
+    out property <int> focused-index: -1;
+    out property <int> column-count: min(max(1, max-columns), max(1, items.length),
+        max(1, floor((self.width + FluentMetrics.radio-column-spacing) /
+            (max(minimum-target, FluentMetrics.radio-min-width) + FluentMetrics.radio-column-spacing))));
+    callback selection-changed(int);
+    out property <Point> items-origin: columns.absolute-position;
+
+    property <int> minimum-rows: floor(items.length / max(1, column-count));
+    property <int> longer-columns: mod(items.length, max(1, column-count));
+    property <int> first-enabled: items.length == 0 ? -1
+        : RadioNavigation.target(items, column-count, -1, RadioDirection.first);
+    property <int> tab-anchor: -1;
+    property <int> focus-request: -1;
+    property <int> tab-target: can-focus(tab-anchor) ? tab-anchor
+        : can-focus(selected-index) ? selected-index : first-enabled;
+
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+    min-width: max(minimum-target, FluentMetrics.radio-min-width);
+    preferred-width: self.min-width;
+    accessible-role: radio-group;
+    accessible-label: title;
+    accessible-enabled: self.enabled;
+    accessible-item-count: items.length;
+
+    changed focused-index => {
+        // Slint sends FocusOut before it scans for the next tab stop.
+        if (root.focused-index < 0) { root.tab-anchor = -1; }
+    }
+
+    pure function can-focus(index: int) -> bool {
+        return index >= 0 && index < items.length && !items[index].disabled;
+    }
+
+    function select(index: int) {
+        if (root.selected-index != index) {
+            root.selected-index = index;
+            root.selection-changed(index);
+        }
+    }
+
+    key-pressed(event) => {
+        if (!root.enabled || root.focused-index < 0) { return reject; }
+        let forwards = event.text == Key.DownArrow;
+        let backwards = event.text == Key.UpArrow;
+        let left = event.text == Key.LeftArrow;
+        if (!forwards && !backwards && !left && event.text != Key.RightArrow) { return reject; }
+        let direction = forwards ? RadioDirection.next : backwards ? RadioDirection.previous
+            : left ? RadioDirection.left : RadioDirection.right;
+        let from = root.focus-request >= 0 ? root.focus-request : root.focused-index;
+        let target = RadioNavigation.target(root.items, root.column-count, from, direction);
+        if (root.can-focus(target)) {
+            root.focus-request = target;
+            if (!event.modifiers.control) { root.select(target); }
+        }
+        return accept;
+    }
+
+    VerticalLayout {
+        spacing: FluentMetrics.spacing-medium;
+        if root.title != "" : FluentText {
+            text: root.title;
+            color: root.enabled ? FluentTheme.text-primary : FluentTheme.text-disabled;
+            accessible-role: none;
+            wrap: word-wrap;
+        }
+        columns := HorizontalLayout {
+            spacing: FluentMetrics.radio-column-spacing;
+            for column in (root.items.length == 0 ? 0 : root.column-count) : VerticalLayout {
+                alignment: start;
+                spacing: FluentMetrics.spacing-medium;
+                horizontal-stretch: 1;
+                for row in root.minimum-rows + (column < root.longer-columns ? 1 : 0) : RadioOption {
+                    property <int> index: column * root.minimum-rows + min(column, root.longer-columns) + row;
+                    property <bool> requested: root.focus-request == index;
+                    text: root.items[index].text;
+                    checked: root.selected-index == index;
+                    enabled: root.enabled && !root.items[index].disabled;
+                    minimum-target: root.minimum-target;
+                    focus-on-tab-navigation: root.tab-target == index;
+                    accessible-item-index: index;
+                    selection-requested => { root.select(self.index); }
+                    changed requested => { if (self.requested && self.enabled) { self.focus(); } }
+                    focus-changed-event => {
+                        if (self.has-focus) {
+                            root.focused-index = self.index;
+                            root.tab-anchor = self.index;
+                            root.focus-request = -1;
+                        } else if (root.focused-index == self.index) {
+                            root.focused-index = -1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

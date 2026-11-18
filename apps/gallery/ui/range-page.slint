@@ -1,0 +1,171 @@
+import { Button, ButtonState, ButtonVariant } from "../../../ui/button.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { ProgressBar, ProgressBarStatus } from "../../../ui/progress-bar.slint";
+import { ProgressRing } from "../../../ui/progress-ring.slint";
+import { Slider, SliderSurface, SliderTickPlacement } from "../../../ui/slider.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+import { Caption } from "caption.slint";
+
+export struct RangeBounds {
+    position: Point,
+    width: length,
+    height: length,
+}
+
+export component RangePage inherits Flickable {
+    in property <length> target-size;
+    in property <bool> animations-enabled;
+    in-out property <bool> slider-enabled: true;
+    in-out property <bool> slider-snap-to-ticks;
+    in-out property <bool> slider-reversed;
+    in-out property <float> slider-maximum: 100;
+    in-out property <float> value <=> slider.value;
+    in-out property <float> vertical-value <=> vertical.value;
+    in-out property <bool> indeterminate;
+    in-out property <bool> ring-active: true;
+    in-out property <ProgressBarStatus> status;
+    out property <int> edits;
+    out property <ButtonState> slider-state: slider.state;
+    out property <bool> slider-focus-visible: slider.focus-visible;
+    out property <RangeBounds> slider-bounds: { position: slider.absolute-position, width: slider.width, height: slider.height };
+    out property <RangeBounds> vertical-bounds: { position: vertical.absolute-position, width: vertical.width, height: vertical.height };
+    out property <RangeBounds> bar-bounds: { position: bar.absolute-position, width: bar.width, height: bar.height };
+    out property <RangeBounds> ring-bounds: { position: ring.absolute-position, width: ring.width, height: ring.height };
+
+    content-width: self.width;
+    content-height: max(self.height, page.preferred-height);
+    mouse-drag-pan-enabled: false;
+
+    page := VerticalLayout {
+        width: parent.width;
+        height: self.preferred-height;
+        padding: FluentMetrics.spacing-medium;
+        spacing: FluentMetrics.spacing-large;
+
+        Caption { text: "Slider · " + round(root.value); }
+        slider := Slider {
+            value: 40;
+            maximum: root.slider-maximum;
+            step-frequency: 5;
+            small-change: 5;
+            tick-frequency: 20;
+            tick-placement: SliderTickPlacement.outside;
+            snap-to-ticks: root.slider-snap-to-ticks;
+            direction-reversed: root.slider-reversed;
+            enabled: root.slider-enabled;
+            minimum-target: root.target-size;
+            accessible-label: "Example progress";
+            value-changed(value) => { root.edits += 1; }
+        }
+        Caption { text: "ProgressBar"; }
+        bar := ProgressBar {
+            value: root.value;
+            maximum: root.slider-maximum;
+            indeterminate: root.indeterminate;
+            status: root.status;
+            animations-enabled: root.animations-enabled;
+            accessible-label: "Example progress bar";
+        }
+        HorizontalLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-large;
+            Caption { text: "ProgressRing"; }
+            ring := ProgressRing {
+                value: root.value;
+                maximum: root.slider-maximum;
+                indeterminate: root.indeterminate;
+                active: root.ring-active;
+                animations-enabled: root.animations-enabled;
+                label: "Example progress ring";
+            }
+            ProgressRing {
+                preferred-width: 60px;
+                preferred-height: 60px;
+                value: root.value;
+                maximum: root.slider-maximum;
+                indeterminate: root.indeterminate;
+                active: root.ring-active;
+                animations-enabled: root.animations-enabled;
+                track-color: FluentTheme.control-strong-fill;
+                label: "Large progress ring";
+            }
+        }
+        FlexboxLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-medium;
+            Button {
+                text: root.indeterminate ? "Show value" : "Indeterminate";
+                minimum-target: root.target-size;
+                clicked => { root.indeterminate = !root.indeterminate; }
+            }
+            Button {
+                text: root.ring-active ? "Hide ring" : "Show ring";
+                minimum-target: root.target-size;
+                clicked => { root.ring-active = !root.ring-active; }
+            }
+            for option in [
+                { label: "Normal", status: ProgressBarStatus.normal },
+                { label: "Paused", status: ProgressBarStatus.paused },
+                { label: "Error", status: ProgressBarStatus.error },
+            ] : Button {
+                text: option.label;
+                minimum-target: root.target-size;
+                variant: root.status == option.status ? ButtonVariant.accent : ButtonVariant.standard;
+                clicked => { root.status = option.status; }
+            }
+        }
+        FlexboxLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-medium;
+            Button {
+                text: root.slider-enabled ? "Disable slider" : "Enable slider";
+                minimum-target: root.target-size;
+                clicked => { root.slider-enabled = !root.slider-enabled; }
+            }
+            Button {
+                text: root.slider-snap-to-ticks ? "Snap to steps" : "Snap to ticks";
+                minimum-target: root.target-size;
+                clicked => { root.slider-snap-to-ticks = !root.slider-snap-to-ticks; }
+            }
+            Button {
+                text: root.slider-reversed ? "Restore direction" : "Reverse direction";
+                minimum-target: root.target-size;
+                clicked => { root.slider-reversed = !root.slider-reversed; }
+            }
+        }
+        Caption { text: "Vertical Slider · " + round(root.vertical-value); }
+        vertical := Slider {
+            orientation: Orientation.vertical;
+            minimum: -50;
+            maximum: 50;
+            value: 0;
+            tick-frequency: 10;
+            tick-placement: SliderTickPlacement.outside;
+            snap-to-ticks: true;
+            direction-reversed: root.slider-reversed;
+            enabled: root.slider-enabled;
+            minimum-target: root.target-size;
+            accessible-label: "Vertical slider";
+        }
+        FluentText {
+            text: "Slider states";
+            font-weight: FluentMetrics.strong-weight;
+        }
+        for sample in [
+            { label: "Normal", state: ButtonState.normal, focused: false },
+            { label: "Pointer over", state: ButtonState.pointer-over, focused: false },
+            { label: "Pressed", state: ButtonState.pressed, focused: false },
+            { label: "Keyboard focus", state: ButtonState.normal, focused: true },
+            { label: "Disabled", state: ButtonState.disabled, focused: false },
+        ] : VerticalLayout {
+            spacing: FluentMetrics.spacing-small;
+            Caption { text: sample.label; }
+            SliderSurface {
+                height: FluentMetrics.slider-cross-size;
+                fraction: 0.4;
+                state: sample.state;
+                focus-visible: sample.focused;
+            }
+        }
+    }
+}

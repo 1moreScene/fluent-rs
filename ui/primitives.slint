@@ -1,0 +1,52 @@
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export component FluentSurface inherits Rectangle {
+    background: FluentTheme.card-fill;
+    border-radius: FluentMetrics.control-radius;
+    border-width: FluentMetrics.control-stroke;
+    border-color: FluentTheme.card-stroke;
+}
+
+export component FluentElevatedSurface inherits FluentSurface {
+    border-radius: FluentMetrics.overlay-radius;
+    drop-shadow-color: FluentTheme.surface-shadow;
+    drop-shadow-blur: FluentTheme.high-contrast ? 0px : FluentMetrics.surface-shadow-blur;
+    drop-shadow-offset-y: FluentTheme.high-contrast ? 0px : FluentMetrics.surface-shadow-offset;
+}
+
+export component FluentText inherits Text {
+    color: FluentTheme.text-primary;
+    font-size: FluentMetrics.body-size;
+    font-weight: FluentMetrics.regular-weight;
+}
+
+export component FluentIcon inherits Path {
+    stroke: FluentTheme.text-primary;
+    stroke-width: FluentMetrics.control-stroke;
+    accessible-role: none;
+}
+
+// The host provides the focus policy and leaves room for the outer stroke.
+export component FluentFocusRing {
+    in property <length> corner-radius: FluentMetrics.control-radius;
+    in property <length> horizontal-outset: FluentMetrics.focus-outset;
+
+    Rectangle {
+        x: -root.horizontal-outset;
+        y: -FluentMetrics.focus-outset;
+        width: root.width + 2 * root.horizontal-outset;
+        height: root.height + 2 * FluentMetrics.focus-outset;
+        border-radius: root.corner-radius + FluentMetrics.focus-outset;
+        border-width: FluentMetrics.focus-outer-stroke;
+        border-color: FluentTheme.focus-outer;
+    }
+    Rectangle {
+        x: -(root.horizontal-outset - FluentMetrics.focus-outer-stroke);
+        y: -FluentMetrics.focus-inner-stroke;
+        width: root.width - 2 * self.x;
+        height: root.height + 2 * FluentMetrics.focus-inner-stroke;
+        border-radius: root.corner-radius + FluentMetrics.focus-inner-stroke;
+        border-width: FluentMetrics.focus-inner-stroke;
+        border-color: FluentTheme.focus-inner;
+    }
+}

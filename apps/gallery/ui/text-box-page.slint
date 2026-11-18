@@ -1,0 +1,115 @@
+import { Button } from "../../../ui/button.slint";
+import { TextBox, TextBoxClearIcon, TextBoxState, TextBoxSurface } from "../../../ui/text-box.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+import { Caption } from "caption.slint";
+
+export component TextBoxPage inherits Flickable {
+    in property <length> target-size;
+    in-out property <bool> editing-enabled: true;
+    in-out property <string> editable-text <=> editable.text;
+    out property <TextBoxState> editable-state: editable.state;
+    out property <bool> editable-selection: editable.has-selection;
+    out property <bool> editable-clear-visible: editable.clear-button-visible;
+    out property <bool> other-clear-visible: read-only.clear-button-visible || multi-line.clear-button-visible;
+    out property <int> edits;
+    out property <int> submissions;
+    out property <length> editable-x: editable.absolute-position.x + editable.width / 2;
+    out property <length> editable-y: editable.absolute-position.y + editable.height - FluentMetrics.text-box-min-height / 2;
+    out property <length> editable-bottom: editable.absolute-position.y + editable.height;
+    out property <length> editable-right: editable.absolute-position.x + editable.width;
+    out property <length> read-only-x: read-only.absolute-position.x + read-only.width / 2;
+    out property <length> read-only-y: read-only.absolute-position.y + read-only.height - FluentMetrics.text-box-min-height / 2;
+    out property <TextBoxState> read-only-state: read-only.state;
+    out property <string> read-only-text: read-only.text;
+    out property <bool> read-only-selection: read-only.has-selection;
+    out property <length> multi-line-x: multi-line.absolute-position.x + multi-line.width / 2;
+    out property <length> multi-line-y: multi-line.absolute-position.y + multi-line.height - FluentMetrics.text-box-min-height / 2;
+    out property <string> multi-line-text: multi-line.text;
+
+    content-width: self.width;
+    content-height: max(self.height, page.preferred-height);
+
+    page := VerticalLayout {
+        width: parent.width;
+        height: self.preferred-height;
+        padding: FluentMetrics.spacing-small;
+        spacing: FluentMetrics.spacing-large;
+
+        VerticalLayout {
+            spacing: FluentMetrics.spacing-medium;
+
+            editable := TextBox {
+                label: "Editable";
+                placeholder-text: "Type a name";
+                minimum-target: root.target-size;
+                enabled: root.editing-enabled;
+                edited => { root.edits += 1; }
+                accepted => { root.submissions += 1; }
+            }
+            HorizontalLayout {
+                spacing: FluentMetrics.spacing-medium;
+                alignment: start;
+                Button {
+                    text: root.editing-enabled ? "Disable input" : "Enable input";
+                    minimum-target: root.target-size;
+                    clicked => { root.editing-enabled = !root.editing-enabled; }
+                }
+                Caption { text: "Enter submissions: \{root.submissions}"; }
+            }
+            read-only := TextBox {
+                label: "Read only";
+                text: "Select or copy this text.";
+                read-only: true;
+                minimum-target: root.target-size;
+            }
+            multi-line := TextBox {
+                label: "Multiline";
+                placeholder-text: "Enter starts a new line";
+                multiline: true;
+                preferred-height: FluentMetrics.text-box-min-height * 3;
+                minimum-target: root.target-size;
+            }
+        }
+
+        VerticalLayout {
+            spacing: FluentMetrics.spacing-medium;
+            Text {
+                text: "TextBox states";
+                color: FluentTheme.text-primary;
+                font-size: FluentMetrics.body-size;
+                font-weight: FluentMetrics.strong-weight;
+            }
+            for sample in [
+                { name: "Normal", state: TextBoxState.normal, value: "Placeholder", placeholder: true },
+                { name: "Pointer over", state: TextBoxState.pointer-over, value: "Text input", placeholder: false },
+                { name: "Focused", state: TextBoxState.focused, value: "Text input", placeholder: false },
+                { name: "Disabled", state: TextBoxState.disabled, value: "Text input", placeholder: false },
+                { name: "Read only", state: TextBoxState.normal, value: "Selectable text", placeholder: false },
+            ] : HorizontalLayout {
+                spacing: FluentMetrics.spacing-medium;
+                Caption { text: sample.name; width: 86px; }
+                frame := TextBoxSurface {
+                    state: sample.state;
+                    min-height: FluentMetrics.text-box-min-height;
+                    horizontal-stretch: 1;
+                    Text {
+                        x: FluentMetrics.text-box-padding-left + FluentMetrics.control-stroke;
+                        y: FluentMetrics.text-box-padding-top + FluentMetrics.control-stroke;
+                        width: max(0px, parent.width - self.x - FluentMetrics.text-box-padding-right - FluentMetrics.control-stroke);
+                        height: max(0px, parent.height - self.y - FluentMetrics.text-box-padding-bottom - FluentMetrics.control-stroke);
+                        text: sample.value;
+                        color: sample.placeholder ? frame.placeholder-color : frame.foreground;
+                        font-size: FluentMetrics.body-size;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        accessible-role: none;
+                    }
+                    if sample.state == TextBoxState.focused : TextBoxClearIcon {
+                        x: parent.width - (parent.height + FluentMetrics.text-box-clear-inset + self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,144 @@
+import { ButtonState, FluentPressable } from "interaction.slint";
+import { FluentMotion } from "motion.slint";
+import { FluentFocusRing, FluentSurface, FluentText } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export component RadioButtonSurface {
+    in property <string> text;
+    in property <bool> checked;
+    in property <ButtonState> state;
+    in property <bool> focus-visible;
+    in property <length> minimum-target;
+
+    property <bool> hovered: state == ButtonState.pointer-over;
+    property <bool> pressed: state == ButtonState.pressed;
+    property <bool> disabled: state == ButtonState.disabled;
+    property <length> ring-size: FluentMetrics.radio-ring-size;
+    property <color> accent: disabled ? FluentTheme.accent-fill-disabled : pressed ? FluentTheme.accent-fill-pressed
+        : hovered ? FluentTheme.accent-fill-hover : FluentTheme.accent-fill;
+
+    min-width: max(minimum-target, FluentMetrics.radio-min-width, content.min-width);
+    preferred-width: max(self.min-width, content.preferred-width);
+    min-height: max(minimum-target, FluentMetrics.radio-min-height);
+
+    pure function ring-fill() -> color {
+        if (FluentTheme.high-contrast) {
+            if (disabled) { return FluentTheme.contrast-surface; }
+            if (checked) { return hovered || pressed ? FluentTheme.contrast-button-face : FluentTheme.contrast-highlight-text; }
+            return hovered || pressed ? FluentTheme.contrast-highlight-text : FluentTheme.contrast-button-face;
+        }
+        if (checked) { return accent; }
+        return disabled ? transparent : pressed ? FluentTheme.control-alt-fill-pressed
+            : hovered ? FluentTheme.control-alt-fill-hover : FluentTheme.control-alt-fill;
+    }
+
+    pure function ring-stroke() -> color {
+        if (FluentTheme.high-contrast) {
+            if (disabled) { return FluentTheme.contrast-disabled; }
+            if (checked) { return pressed ? FluentTheme.contrast-button-face
+                : hovered ? FluentTheme.contrast-button-text : FluentTheme.contrast-highlight; }
+            return pressed ? FluentTheme.contrast-highlight-text
+                : hovered ? FluentTheme.contrast-highlight : FluentTheme.contrast-button-text;
+        }
+        return checked ? accent : disabled || pressed ? FluentTheme.control-strong-stroke-disabled : FluentTheme.control-strong-stroke;
+    }
+
+    content := HorizontalLayout {
+        alignment: start;
+        spacing: root.text == "" ? 0px : FluentMetrics.radio-label-gap;
+        Rectangle {
+            width: root.ring-size;
+            min-height: max(root.minimum-target, FluentMetrics.radio-min-height);
+            FluentSurface {
+                x: 0px;
+                y: (max(root.minimum-target, FluentMetrics.radio-min-height) - self.height) / 2;
+                width: root.ring-size;
+                height: self.width;
+                border-radius: self.width / 2;
+                background: root.ring-fill();
+                border-color: root.ring-stroke();
+
+                Rectangle {
+                    width: root.pressed ? FluentMetrics.radio-pressed-dot-size
+                        : root.checked ? (root.hovered ? FluentMetrics.radio-hover-dot-size : FluentMetrics.radio-dot-size)
+                        : FluentMetrics.radio-dot-start-size;
+                    height: self.width;
+                    border-radius: self.width / 2;
+                    visible: root.checked || root.pressed;
+                    background: FluentTheme.high-contrast
+                        ? (root.disabled ? FluentTheme.contrast-disabled : root.hovered || root.pressed
+                            ? FluentTheme.contrast-button-text : FluentTheme.contrast-highlight)
+                        : FluentTheme.accent-text;
+                    animate width {
+                        enabled: FluentMotion.enabled && !root.disabled;
+                        duration: root.checked && (root.hovered || root.pressed)
+                            ? FluentMotion.control-normal-duration : FluentMotion.control-fast-duration;
+                        easing: FluentMotion.control-fast-out-slow-in;
+                    }
+                }
+            }
+        }
+
+        if root.text != "" : VerticalLayout {
+            padding-top: FluentMetrics.radio-label-top + max(0px, root.minimum-target - FluentMetrics.radio-min-height) / 2;
+            alignment: start;
+            horizontal-stretch: 1;
+            FluentText {
+                text: root.text;
+                color: root.disabled ? FluentTheme.text-disabled
+                    : FluentTheme.high-contrast ? FluentTheme.contrast-button-text : FluentTheme.text-primary;
+                wrap: word-wrap;
+                overflow: elide;
+                accessible-role: none;
+            }
+        }
+    }
+
+    if root.focus-visible && !root.disabled : FluentFocusRing {
+        width: 100%;
+        height: 100%;
+        horizontal-outset: FluentMetrics.radio-focus-outset;
+    }
+}
+
+component RadioOption inherits FluentPressable {
+    in-out property <bool> checked;
+    in property <string> text;
+    in property <length> minimum-target;
+    callback selection-requested;
+
+    accepts-enter: false;
+    focus-on-press: true;
+    min-width: surface.min-width;
+    min-height: surface.min-height;
+    preferred-width: surface.preferred-width;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: radio-button;
+    accessible-label: text;
+    accessible-enabled: self.enabled;
+    accessible-checkable: true;
+    accessible-checked: checked;
+    accessible-action-default => { if (root.enabled) { root.activated(); } }
+    activated => { if (root.enabled && !root.checked) { root.selection-requested(); } }
+
+    surface := RadioButtonSurface {
+        width: 100%;
+        height: 100%;
+        text: root.text;
+        checked: root.checked;
+        state: root.state;
+        focus-visible: root.focus-visible;
+        minimum-target: root.minimum-target;
+    }
+}
+
+export { RadioOption }
+
+export component RadioButton inherits RadioOption {
+    callback selected;
+    selection-requested => {
+        root.checked = true;
+        root.selected();
+    }
+}

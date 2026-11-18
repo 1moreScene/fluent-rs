@@ -1,0 +1,33 @@
+name: FluentGallery
+options:
+  bundleIdPrefix: org.fluentrs
+targets:
+  FluentGallery:
+    type: application
+    platform: iOS
+    deploymentTarget: '16.0'
+    sources: []
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.fluentrs.gallery
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+      configs:
+        Debug:
+          ONLY_ACTIVE_ARCH: YES
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Fluent RS Gallery
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Slint
+                UISceneDelegateClassName: SlintWindowSceneDelegate
+    postCompileScripts:
+      - name: Build Gallery with Cargo
+        script: /bin/bash "$SRCROOT/build-gallery.bash"
+        basedOnDependencyAnalysis: false
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)

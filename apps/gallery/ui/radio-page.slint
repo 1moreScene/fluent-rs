@@ -1,0 +1,93 @@
+import { ButtonState } from "../../../ui/interaction.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { RadioButton, RadioButtonSurface } from "../../../ui/radio-button.slint";
+import { RadioGroup } from "../../../ui/radio-group.slint";
+import { FluentMetrics } from "../../../ui/tokens.slint";
+import { Caption } from "caption.slint";
+
+export component RadioPage inherits Flickable {
+    in property <length> target-size;
+    in property <int> max-columns: 3;
+    in-out property <int> profile-selection <=> profiles.selected-index;
+    in-out property <int> quality-selection <=> quality.selected-index;
+    out property <int> profile-focus: profiles.focused-index;
+    out property <int> quality-focus: quality.focused-index;
+    out property <int> profile-columns: profiles.column-count;
+    out property <int> profile-changes;
+    out property <Point> profile-origin: profiles.items-origin;
+    out property <Point> quality-origin: quality.items-origin;
+    out property <bool> standalone-checked: standalone.checked;
+    out property <Point> standalone-center: {
+        x: standalone.absolute-position.x + standalone.width / 2,
+        y: standalone.absolute-position.y + standalone.height / 2,
+    };
+    out property <ButtonState> standalone-state: standalone.state;
+    out property <length> standalone-height: standalone.height;
+
+    content-width: self.width;
+    content-height: max(self.height, page.preferred-height);
+    mouse-drag-pan-enabled: false;
+
+    page := VerticalLayout {
+        width: parent.width;
+        height: self.preferred-height;
+        padding-left: FluentMetrics.spacing-medium;
+        padding-right: self.padding-left;
+        padding-top: FluentMetrics.spacing-small;
+        padding-bottom: self.padding-top;
+        spacing: FluentMetrics.spacing-large;
+
+        profiles := RadioGroup {
+            title: "Performance profile";
+            max-columns: root.max-columns;
+            selected-index: 0;
+            minimum-target: root.target-size;
+            items: [
+                { text: "Balanced", disabled: false },
+                { text: "Quiet", disabled: true },
+                { text: "Efficiency", disabled: false },
+                { text: "High performance", disabled: false },
+                { text: "Custom", disabled: false },
+            ];
+            selection-changed(index) => { root.profile-changes += 1; }
+        }
+        quality := RadioGroup {
+            title: "Image quality";
+            selected-index: 1;
+            max-columns: 2;
+            minimum-target: root.target-size;
+            items: [
+                { text: "Standard", disabled: false },
+                { text: "High", disabled: false },
+            ];
+        }
+        standalone := RadioButton {
+            text: "Standalone option";
+            minimum-target: root.target-size;
+        }
+
+        FluentText {
+            text: "RadioButton states";
+            font-weight: FluentMetrics.strong-weight;
+        }
+        HorizontalLayout {
+            spacing: FluentMetrics.spacing-large;
+            for checked in [false, true] : VerticalLayout {
+                spacing: FluentMetrics.spacing-medium;
+                Caption { text: checked ? "Checked" : "Unchecked"; }
+                for sample in [
+                    { text: "Normal", state: ButtonState.normal, focused: false },
+                    { text: "Pointer over", state: ButtonState.pointer-over, focused: false },
+                    { text: "Pressed", state: ButtonState.pressed, focused: false },
+                    { text: "Keyboard focus", state: ButtonState.normal, focused: true },
+                    { text: "Disabled", state: ButtonState.disabled, focused: false },
+                ] : RadioButtonSurface {
+                    text: sample.text;
+                    state: sample.state;
+                    focus-visible: sample.focused;
+                    checked: checked;
+                }
+            }
+        }
+    }
+}

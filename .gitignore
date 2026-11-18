@@ -1,0 +1,7 @@
+/references/
+/target/
+/.artifacts/
+/tests/visual/tmp/
+__pycache__/
+/platforms/ios/*.xcodeproj/
+/platforms/ios/Info.plist

@@ -1,0 +1,155 @@
+import { Button, ButtonVariant } from "../../../ui/button.slint";
+import { FluentInAppAcrylic, FluentMaterial } from "../../../ui/material.slint";
+import { FluentElevatedSurface, FluentIcon, FluentText } from "../../../ui/primitives.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+import { Caption } from "caption.slint";
+
+export enum AppearanceAction { toggle-motion, toggle-text-scale, toggle-accent }
+
+export component FoundationsPage inherits Flickable {
+    in property <length> target-size;
+    in property <bool> alternate-accent;
+    in property <FluentMaterial> backdrop;
+    in property <bool> native-desktop-acrylic;
+    in-out property <bool> preview-acrylic;
+    out property <Point> acrylic-sample: {
+        x: acrylic.absolute-position.x + acrylic.width / 4,
+        y: acrylic.absolute-position.y + acrylic.height / 4,
+    };
+    out property <Point> acrylic-seam: {
+        x: acrylic.absolute-position.x + acrylic.width / 2,
+        y: acrylic.absolute-position.y + acrylic.height / 4,
+    };
+    out property <Point> motion-button-center: {
+        x: motion-button.absolute-position.x + motion-button.width / 2,
+        y: motion-button.absolute-position.y + motion-button.height / 2,
+    };
+    callback change-appearance(AppearanceAction);
+    callback select-backdrop(FluentMaterial);
+
+    content-width: self.width;
+    content-height: max(self.height, page.preferred-height);
+    mouse-drag-pan-enabled: false;
+
+    page := VerticalLayout {
+        width: parent.width;
+        height: self.preferred-height;
+        padding: FluentMetrics.spacing-medium;
+        spacing: FluentMetrics.spacing-large;
+
+        FlexboxLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-medium;
+            Button {
+                text: root.alternate-accent ? "Restore blue accent" : "Use violet accent";
+                variant: ButtonVariant.accent;
+                minimum-target: root.target-size;
+                clicked => { root.change-appearance(AppearanceAction.toggle-accent); }
+            }
+            Button {
+                text: FluentTheme.text-scale > 1 ? "Reset text size" : "Enlarge text";
+                minimum-target: root.target-size;
+                clicked => { root.change-appearance(AppearanceAction.toggle-text-scale); }
+            }
+            motion-button := Button {
+                text: FluentTheme.reduced-motion ? "Enable animations" : "Reduce motion";
+                minimum-target: root.target-size;
+                clicked => { root.change-appearance(AppearanceAction.toggle-motion); }
+            }
+        }
+
+        VerticalLayout {
+            spacing: FluentMetrics.spacing-medium;
+            FluentText {
+                text: "Window background";
+                font-weight: FluentMetrics.strong-weight;
+            }
+            FlexboxLayout {
+                alignment: start;
+                spacing: FluentMetrics.spacing-medium;
+                for option in [
+                    { name: "Solid", value: FluentMaterial.solid-fallback },
+                    { name: "Mica", value: FluentMaterial.mica },
+                    { name: "Mica Alt", value: FluentMaterial.mica-alt },
+                    { name: "Desktop Acrylic", value: FluentMaterial.desktop-acrylic },
+                ] : Button {
+                    text: option.name;
+                    minimum-target: root.target-size;
+                    variant: root.backdrop == option.value ? ButtonVariant.accent : ButtonVariant.standard;
+                    accessible-description: root.backdrop == option.value ? "Selected background material" : "Apply background material";
+                    clicked => { root.select-backdrop(option.value); }
+                }
+            }
+            if root.backdrop != FluentMaterial.solid-fallback : Caption {
+                text: root.native-desktop-acrylic ? "Windows Desktop Acrylic" : "Solid fallback";
+            }
+        }
+
+        VerticalLayout {
+            spacing: FluentMetrics.spacing-medium;
+            FluentText {
+                text: "In-app Acrylic";
+                font-weight: FluentMetrics.strong-weight;
+            }
+            Button {
+                text: root.preview-acrylic ? "Use solid fallback" : "Preview in-app blur";
+                minimum-target: root.target-size;
+                clicked => { root.preview-acrylic = !root.preview-acrylic; }
+            }
+            Rectangle {
+                min-height: 96px;
+                background: @linear-gradient(90deg, FluentTheme.accent-fill 50%, FluentTheme.page-alt 50%);
+
+                acrylic := FluentInAppAcrylic {
+                    x: FluentMetrics.spacing-large;
+                    y: FluentMetrics.spacing-large;
+                    width: parent.width - 2 * self.x;
+                    height: parent.height - 2 * self.y;
+                    blur-enabled: root.preview-acrylic;
+                    FluentText {
+                        text: root.preview-acrylic && !FluentTheme.high-contrast ? "Blur and tint preview" : "Solid fallback";
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        FluentElevatedSurface {
+            min-height: typography.min-height;
+            preferred-height: typography.preferred-height;
+
+            typography := VerticalLayout {
+                padding: FluentMetrics.spacing-large;
+                spacing: FluentMetrics.spacing-medium;
+                HorizontalLayout {
+                    spacing: FluentMetrics.spacing-medium;
+                    alignment: start;
+                    FluentIcon {
+                        width: FluentMetrics.spacing-large;
+                        height: FluentMetrics.spacing-large;
+                        viewbox-width: 16;
+                        viewbox-height: 16;
+                        commands: "M 2 8 L 6 12 L 14 4";
+                        stroke-line-cap: round;
+                    }
+                    FluentText {
+                        text: "Typography";
+                        font-size: FluentMetrics.title-size;
+                        font-weight: FluentMetrics.strong-weight;
+                        wrap: word-wrap;
+                    }
+                }
+                FluentText { text: "Body"; }
+                FluentText {
+                    text: "Body Strong";
+                    font-weight: FluentMetrics.strong-weight;
+                }
+                Caption {
+                    text: "Caption";
+                    font-size: FluentMetrics.caption-size;
+                }
+            }
+        }
+    }
+}

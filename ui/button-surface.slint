@@ -1,0 +1,132 @@
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+import { FluentMotion } from "motion.slint";
+import { FluentSurface, FluentText, FluentFocusRing } from "primitives.slint";
+import { ButtonState } from "interaction.slint";
+export { ButtonState }
+
+export enum ButtonVariant { standard, accent, subtle }
+
+// Shared by the interactive Button and the non-interactive Gallery samples.
+export component ButtonSurface {
+    in property <string> text;
+    in property <ButtonVariant> variant;
+    in property <ButtonState> state;
+    in property <bool> focus-visible;
+    in property <bool> wrap-text;
+    in property <length> minimum-target;
+    in property <color> contrast-fill: pressed ? FluentTheme.contrast-highlight-text
+        : hovered || (accent && !disabled) ? FluentTheme.contrast-highlight : FluentTheme.contrast-surface;
+    in property <color> contrast-foreground: disabled ? FluentTheme.contrast-disabled
+        : pressed ? FluentTheme.contrast-highlight
+        : hovered || accent ? FluentTheme.contrast-highlight-text : FluentTheme.contrast-text;
+    in property <brush> contrast-border: disabled ? FluentTheme.contrast-disabled
+        : hovered || pressed || accent ? FluentTheme.contrast-highlight : subtle ? #0000 : FluentTheme.contrast-text;
+
+    property <bool> accent: variant == ButtonVariant.accent;
+    property <bool> subtle: variant == ButtonVariant.subtle;
+    property <bool> hovered: state == ButtonState.pointer-over;
+    property <bool> pressed: state == ButtonState.pressed;
+    property <bool> disabled: state == ButtonState.disabled;
+    property <length> stroke: FluentMetrics.control-stroke;
+    property <length> radius: FluentMetrics.control-radius;
+    property <length> fill-inset: accent ? 0px : stroke;
+    property <float> elevation-start: 100% * FluentMetrics.elevation-stop / max(1px, self.height);
+    property <float> elevation-end: 100% * FluentMetrics.elevation-depth / max(1px, self.height);
+    property <float> bottom-elevation-start: 100% - elevation-end;
+    property <float> bottom-elevation-end: 100% - elevation-start;
+    property <brush> standard-border: FluentTheme.dark
+        ? @linear-gradient(180deg, FluentTheme.control-stroke-elevated elevation-start, FluentTheme.control-stroke elevation-end)
+        : @linear-gradient(180deg, FluentTheme.control-stroke bottom-elevation-start, FluentTheme.control-stroke-elevated bottom-elevation-end);
+    property <brush> accent-border: @linear-gradient(180deg, FluentTheme.accent-stroke bottom-elevation-start, FluentTheme.accent-stroke-elevated bottom-elevation-end);
+
+    min-width: max(minimum-target, label-layout.min-width);
+    min-height: max(minimum-target, label-layout.min-height);
+    preferred-width: max(minimum-target, label-layout.preferred-width);
+    preferred-height: max(minimum-target, label-layout.preferred-height);
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    pure function fill() -> color {
+        if (FluentTheme.high-contrast) {
+            return contrast-fill;
+        }
+        if (accent) {
+            return disabled ? FluentTheme.accent-fill-disabled : pressed ? FluentTheme.accent-fill-pressed
+                : hovered ? FluentTheme.accent-fill-hover : FluentTheme.accent-fill;
+        }
+        if (subtle) {
+            return hovered ? FluentTheme.subtle-fill-hover : pressed ? FluentTheme.subtle-fill-pressed : #0000;
+        }
+        return disabled ? FluentTheme.control-fill-disabled : pressed ? FluentTheme.control-fill-pressed
+            : hovered ? FluentTheme.control-fill-hover : FluentTheme.control-fill;
+    }
+
+    pure function foreground() -> color {
+        if (FluentTheme.high-contrast) {
+            return contrast-foreground;
+        }
+        if (accent) {
+            return disabled ? FluentTheme.accent-text-disabled : pressed ? FluentTheme.accent-text-pressed : FluentTheme.accent-text;
+        }
+        return disabled ? FluentTheme.text-disabled : pressed ? FluentTheme.text-secondary : FluentTheme.text-primary;
+    }
+
+    pure function border() -> brush {
+        if (FluentTheme.high-contrast) {
+            return contrast-border;
+        }
+        if (accent) {
+            return pressed || disabled ? #0000 : accent-border;
+        }
+        if (subtle) {
+            return fill();
+        }
+        return pressed || disabled ? FluentTheme.control-stroke : standard-border;
+    }
+
+    Rectangle {
+        x: root.fill-inset;
+        y: root.fill-inset;
+        width: max(0px, root.width - 2 * root.fill-inset);
+        height: max(0px, root.height - 2 * root.fill-inset);
+        border-radius: root.radius - root.fill-inset;
+        background: root.fill();
+        animate background {
+            enabled: FluentMotion.enabled;
+            duration: FluentMotion.control-fill-duration;
+            easing: FluentMotion.control-fill-easing;
+        }
+    }
+
+    FluentSurface {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        border-radius: root.radius;
+        border-color: root.border();
+    }
+
+    label-layout := VerticalLayout {
+        padding-left: FluentMetrics.button-padding-horizontal + root.stroke;
+        padding-right: self.padding-left;
+        padding-top: FluentMetrics.button-padding-top + root.stroke;
+        padding-bottom: FluentMetrics.button-padding-bottom + root.stroke;
+        alignment: center;
+
+        FluentText {
+            text: root.text;
+            color: root.foreground();
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            wrap: root.wrap-text ? word-wrap : no-wrap;
+            overflow: elide;
+            accessible-role: none;
+        }
+    }
+
+    if root.focus-visible && !root.disabled : FluentFocusRing {
+        width: 100%;
+        height: 100%;
+        corner-radius: root.radius;
+    }
+}

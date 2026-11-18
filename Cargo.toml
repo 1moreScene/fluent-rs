@@ -1,0 +1,12 @@
+[workspace]
+members = ["apps/gallery"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.100"
+
+[workspace.dependencies]
+slint = { version = "=1.19.0", default-features = false, features = ["std", "compat-1-18", "renderer-skia"] }
+slint-build = "=1.19.0"

@@ -1,0 +1,152 @@
+import { Button, ButtonState } from "../../../ui/button.slint";
+import { CheckBox, CheckBoxSurface } from "../../../ui/check-box.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { ToggleButton, ToggleButtonSurface, ToggleValue } from "../../../ui/toggle-button.slint";
+import { FluentMetrics } from "../../../ui/tokens.slint";
+import { Caption } from "caption.slint";
+
+export struct ToggleProbe {
+    center: Point,
+    width: length,
+    height: length,
+    state: ButtonState,
+    focus-visible: bool,
+}
+
+component ToggleStateSamples inherits VerticalLayout {
+    in property <bool> check-box;
+    property <[{ text: string, state: ButtonState, focused: bool }]> samples: [
+        { text: "Normal", state: ButtonState.normal, focused: false },
+        { text: "Pointer over", state: ButtonState.pointer-over, focused: false },
+        { text: "Pressed", state: ButtonState.pressed, focused: false },
+        { text: "Keyboard focus", state: ButtonState.normal, focused: true },
+        { text: "Disabled", state: ButtonState.disabled, focused: false },
+    ];
+
+    spacing: FluentMetrics.spacing-medium;
+    for option in [
+        { label: "Unchecked", value: ToggleValue.unchecked },
+        { label: "Checked", value: ToggleValue.checked },
+        { label: "Indeterminate", value: ToggleValue.indeterminate },
+    ] : VerticalLayout {
+        spacing: FluentMetrics.spacing-medium;
+        Caption { text: option.label; }
+
+        if root.check-box : VerticalLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-medium;
+            for sample in root.samples : CheckBoxSurface {
+                text: sample.text;
+                value: option.value;
+                state: sample.state;
+                focus-visible: sample.focused;
+            }
+        }
+        if !root.check-box : FlexboxLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-medium;
+            for sample in root.samples : ToggleButtonSurface {
+                text: sample.text;
+                value: option.value;
+                state: sample.state;
+                focus-visible: sample.focused;
+            }
+        }
+    }
+}
+
+export component TogglesPage inherits Flickable {
+    in property <length> target-size;
+    in property <string> check-label: "CheckBox";
+    in-out property <bool> three-state: true;
+    in-out property <bool> examples-enabled: true;
+    in-out property <ToggleValue> toggle-value <=> toggle.value;
+    in-out property <ToggleValue> check-value <=> check.value;
+    out property <int> toggle-activations;
+    out property <int> check-activations;
+    out property <ToggleProbe> toggle-probe: {
+        center: { x: toggle.absolute-position.x + toggle.width / 2, y: toggle.absolute-position.y + toggle.height / 2 },
+        width: toggle.width,
+        height: toggle.height,
+        state: toggle.state,
+        focus-visible: toggle.focus-visible,
+    };
+    out property <ToggleProbe> check-probe: {
+        center: { x: check.absolute-position.x + check.width / 2, y: check.absolute-position.y + check.height / 2 },
+        width: check.width,
+        height: check.height,
+        state: check.state,
+        focus-visible: check.focus-visible,
+    };
+
+    pure function value-label(value: ToggleValue) -> string {
+        return value == ToggleValue.checked ? "Checked"
+            : value == ToggleValue.indeterminate ? "Indeterminate" : "Unchecked";
+    }
+
+    content-width: self.width;
+    content-height: max(self.height, page.preferred-height);
+    mouse-drag-pan-enabled: false;
+
+    page := VerticalLayout {
+        width: parent.width;
+        height: self.preferred-height;
+        padding: FluentMetrics.spacing-medium;
+        spacing: FluentMetrics.spacing-large;
+
+        FlexboxLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-medium;
+            Button {
+                text: root.examples-enabled ? "Disable examples" : "Enable examples";
+                minimum-target: root.target-size;
+                clicked => { root.examples-enabled = !root.examples-enabled; }
+            }
+            Button {
+                text: root.three-state ? "Use two states" : "Use three states";
+                minimum-target: root.target-size;
+                clicked => { root.three-state = !root.three-state; }
+            }
+        }
+
+        FlexboxLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-large;
+            VerticalLayout {
+                alignment: start;
+                spacing: FluentMetrics.spacing-medium;
+                toggle := ToggleButton {
+                    text: "ToggleButton";
+                    enabled: root.examples-enabled;
+                    three-state: root.three-state;
+                    minimum-target: root.target-size;
+                    toggled(value) => { root.toggle-activations += 1; }
+                }
+                Caption { text: root.value-label(root.toggle-value); }
+            }
+            VerticalLayout {
+                alignment: start;
+                spacing: FluentMetrics.spacing-medium;
+                check := CheckBox {
+                    text: root.check-label;
+                    enabled: root.examples-enabled;
+                    three-state: root.three-state;
+                    minimum-target: root.target-size;
+                    toggled(value) => { root.check-activations += 1; }
+                }
+                Caption { text: root.value-label(root.check-value); }
+            }
+        }
+
+        FluentText {
+            text: "ToggleButton states";
+            font-weight: FluentMetrics.strong-weight;
+        }
+        ToggleStateSamples {}
+        FluentText {
+            text: "CheckBox states";
+            font-weight: FluentMetrics.strong-weight;
+        }
+        ToggleStateSamples { check-box: true; }
+    }
+}

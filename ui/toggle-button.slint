@@ -1,0 +1,50 @@
+import { ButtonSurface, ButtonState, ButtonVariant } from "button-surface.slint";
+import { FluentToggle, ToggleValue } from "toggle.slint";
+import { FluentTheme } from "tokens.slint";
+export { ToggleValue }
+
+export component ToggleButtonSurface inherits ButtonSurface {
+    in property <ToggleValue> value;
+    property <bool> checked: value == ToggleValue.checked;
+    property <bool> mixed: value == ToggleValue.indeterminate;
+    variant: checked ? ButtonVariant.accent : ButtonVariant.standard;
+
+    contrast-fill: self.state == ButtonState.disabled ? FluentTheme.contrast-button-face
+        : checked ? (self.state == ButtonState.pressed ? FluentTheme.contrast-highlight-text
+            : self.state == ButtonState.pointer-over ? FluentTheme.contrast-button-text : FluentTheme.contrast-highlight)
+        : mixed ? FluentTheme.contrast-button-face
+        : self.state == ButtonState.normal ? FluentTheme.contrast-button-face : FluentTheme.contrast-highlight-text;
+    contrast-foreground: self.state == ButtonState.disabled ? FluentTheme.contrast-disabled
+        : checked ? (self.state == ButtonState.pressed ? FluentTheme.contrast-highlight
+            : self.state == ButtonState.pointer-over ? FluentTheme.contrast-button-face : FluentTheme.contrast-highlight-text)
+        : self.state == ButtonState.normal ? FluentTheme.contrast-button-text : FluentTheme.contrast-highlight;
+    contrast-border: self.state == ButtonState.pointer-over
+        ? (checked ? FluentTheme.contrast-button-text : FluentTheme.contrast-highlight)
+        : self.state == ButtonState.pressed && !mixed ? FluentTheme.contrast-highlight-text : transparent;
+}
+
+export component ToggleButton inherits FluentToggle {
+    in property <string> text;
+    in property <bool> wrap-text;
+    in property <length> minimum-target;
+
+    min-width: surface.min-width;
+    min-height: surface.min-height;
+    preferred-width: surface.preferred-width;
+    preferred-height: surface.preferred-height;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: button;
+    accessible-label: text;
+
+    surface := ToggleButtonSurface {
+        width: 100%;
+        height: 100%;
+        text: root.text;
+        state: root.state;
+        value: root.value;
+        focus-visible: root.focus-visible;
+        wrap-text: root.wrap-text;
+        minimum-target: root.minimum-target;
+    }
+}

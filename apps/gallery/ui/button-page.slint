@@ -1,0 +1,109 @@
+import { Button, ButtonState, ButtonVariant } from "../../../ui/button.slint";
+import { ButtonSurface } from "../../../ui/button-surface.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+import { Caption } from "caption.slint";
+
+component StateSample inherits ButtonSurface {
+    text: "Button";
+    horizontal-stretch: 1;
+}
+
+export component ButtonPage inherits Flickable {
+    in property <length> target-size;
+    in-out property <bool> examples-enabled: true;
+    out property <int> activation-count;
+    out property <ButtonState> example-state: standard.state;
+    out property <bool> example-focus-visible: standard.focus-visible;
+    out property <length> example-x: standard.absolute-position.x + standard.width / 2;
+    out property <length> example-y: standard.absolute-position.y + standard.height / 2;
+    out property <length> example-height: standard.height;
+    out property <length> examples-right: subtle.absolute-position.x + subtle.width;
+
+    property <length> state-label-width: 86px;
+    content-width: self.width;
+    content-height: max(self.height, page.preferred-height);
+
+    page := VerticalLayout {
+        width: parent.width;
+        height: self.preferred-height;
+        padding: FluentMetrics.spacing-small;
+        spacing: FluentMetrics.spacing-large;
+
+        VerticalLayout {
+            spacing: FluentMetrics.spacing-medium;
+            Caption { text: "Click, tap, or focus a button and press Space or Enter."; }
+
+            HorizontalLayout {
+                spacing: FluentMetrics.spacing-medium;
+                alignment: start;
+
+                standard := Button {
+                    text: "Standard";
+                    enabled: root.examples-enabled;
+                    minimum-target: root.target-size;
+                    clicked => { root.activation-count += 1; }
+                }
+                Button {
+                    text: "Accent";
+                    variant: ButtonVariant.accent;
+                    enabled: root.examples-enabled;
+                    minimum-target: root.target-size;
+                    clicked => { root.activation-count += 1; }
+                }
+                subtle := Button {
+                    text: "Subtle";
+                    variant: ButtonVariant.subtle;
+                    enabled: root.examples-enabled;
+                    minimum-target: root.target-size;
+                    clicked => { root.activation-count += 1; }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: FluentMetrics.spacing-medium;
+                alignment: start;
+                Button {
+                    text: root.examples-enabled ? "Disable examples" : "Enable examples";
+                    minimum-target: root.target-size;
+                    clicked => { root.examples-enabled = !root.examples-enabled; }
+                }
+                Caption { text: "Activations: \{root.activation-count}"; }
+            }
+        }
+
+        VerticalLayout {
+            spacing: FluentMetrics.spacing-medium;
+            Text {
+                text: "Button states";
+                color: FluentTheme.text-primary;
+                font-size: FluentMetrics.body-size;
+                font-weight: FluentMetrics.strong-weight;
+            }
+            HorizontalLayout {
+                spacing: FluentMetrics.spacing-medium;
+                Rectangle { width: root.state-label-width; }
+                for name in ["Standard", "Accent", "Subtle"] : Caption {
+                    text: name;
+                    horizontal-alignment: center;
+                    horizontal-stretch: 1;
+                }
+            }
+
+            for sample in [
+                { label: "Normal", state: ButtonState.normal, focused: false },
+                { label: "Pointer over", state: ButtonState.pointer-over, focused: false },
+                { label: "Pressed", state: ButtonState.pressed, focused: false },
+                { label: "Keyboard focus", state: ButtonState.normal, focused: true },
+                { label: "Disabled", state: ButtonState.disabled, focused: false },
+            ] : HorizontalLayout {
+                spacing: FluentMetrics.spacing-medium;
+                Caption { text: sample.label; width: root.state-label-width; }
+                for sample-variant in [ButtonVariant.standard, ButtonVariant.accent, ButtonVariant.subtle] : StateSample {
+                    variant: sample-variant;
+                    state: sample.state;
+                    focus-visible: sample.focused;
+                }
+            }
+        }
+    }
+}

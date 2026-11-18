@@ -1,0 +1,48 @@
+[package]
+name = "fluent-gallery"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[target.'cfg(target_os = "windows")'.dependencies]
+slint = { workspace = true, features = ["backend-winit", "accessibility", "renderer-skia-opengl", "raw-window-handle-06"] }
+raw-window-handle = "=0.6.2"
+windows-sys = { version = "=0.61.2", features = ["Wdk_System_SystemServices", "Win32_Graphics_Dwm", "Win32_System_SystemInformation", "Win32_UI_Controls"] }
+
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+slint = { workspace = true, features = ["backend-winit", "accessibility"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+slint = { workspace = true, features = ["backend-android-activity-06"] }
+
+[build-dependencies]
+slint-build.workspace = true
+
+[package.metadata.android]
+package = "org.fluentrs.gallery"
+build_targets = ["aarch64-linux-android"]
+
+[package.metadata.android.sdk]
+min_sdk_version = 35
+target_sdk_version = 35
+
+[package.metadata.android.application]
+label = "Fluent RS Gallery"
+has_code = false
+
+[[package.metadata.android.application.activity]]
+name = "android.app.NativeActivity"
+exported = true
+config_changes = "orientation|screenSize|keyboardHidden"
+
+[[package.metadata.android.application.activity.meta_data]]
+name = "android.app.lib_name"
+value = "fluent_gallery"
+
+[[package.metadata.android.application.activity.intent_filter]]
+actions = ["android.intent.action.MAIN"]
+categories = ["android.intent.category.LAUNCHER"]

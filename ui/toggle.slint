@@ -1,0 +1,24 @@
+import { FluentPressable } from "interaction.slint";
+
+export enum ToggleValue { unchecked, checked, indeterminate }
+
+export component FluentToggle inherits FluentPressable {
+    in-out property <ToggleValue> value;
+    in property <bool> three-state;
+    callback toggled(ToggleValue);
+
+    accessible-checkable: true;
+    accessible-checked: value == ToggleValue.checked;
+    accessible-enabled: self.enabled;
+    accessible-description: value == ToggleValue.indeterminate ? @tr("Indeterminate") : "";
+    accessible-action-default => { if (root.enabled) { root.activated(); } }
+
+    activated => {
+        if (root.enabled) {
+            root.value = root.value == ToggleValue.unchecked ? ToggleValue.checked
+                : root.value == ToggleValue.checked && root.three-state ? ToggleValue.indeterminate
+                : ToggleValue.unchecked;
+            root.toggled(root.value);
+        }
+    }
+}

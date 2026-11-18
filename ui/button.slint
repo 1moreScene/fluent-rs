@@ -1,0 +1,36 @@
+import { ButtonSurface, ButtonState, ButtonVariant } from "button-surface.slint";
+import { FluentPressable } from "interaction.slint";
+export { ButtonState, ButtonVariant }
+
+export component Button inherits FluentPressable {
+    in property <string> text;
+    in property <ButtonVariant> variant;
+    in property <bool> wrap-text;
+    in property <length> minimum-target;
+
+    callback clicked;
+
+    min-width: surface.min-width;
+    min-height: surface.min-height;
+    preferred-width: surface.preferred-width;
+    preferred-height: surface.preferred-height;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    accessible-role: button;
+    accessible-label: text;
+    accessible-enabled: self.enabled;
+    accessible-action-default => { if (root.enabled) { root.activated(); } }
+    activated => { root.clicked(); }
+
+    surface := ButtonSurface {
+        width: 100%;
+        height: 100%;
+        text: root.text;
+        variant: root.variant;
+        state: root.state;
+        focus-visible: root.focus-visible;
+        wrap-text: root.wrap-text;
+        minimum-target: root.minimum-target;
+    }
+}

@@ -1,0 +1,264 @@
+import { ButtonState, FluentPointerArea } from "interaction.slint";
+import { FluentMotion } from "motion.slint";
+import { FluentFocusRing } from "primitives.slint";
+import { FluentRange } from "range.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export enum SliderTickPlacement { none, inline, outside }
+
+export component SliderSurface {
+    in property <Orientation> orientation;
+    in property <bool> direction-reversed;
+    in property <float> fraction;
+    in property <ButtonState> state;
+    in property <bool> focus-visible;
+    in property <float> tick-spacing;
+    in property <SliderTickPlacement> tick-placement;
+
+    property <bool> vertical: orientation == Orientation.vertical;
+    out property <bool> from-end: vertical != direction-reversed;
+    property <bool> disabled: state == ButtonState.disabled;
+    property <bool> pressed: state == ButtonState.pressed;
+    property <bool> hovered: state == ButtonState.pointer-over;
+    property <length> axis-size: vertical ? self.height : self.width;
+    out property <length> travel: max(0px, axis-size - FluentMetrics.slider-thumb-size);
+    out property <length> center: (axis-size - travel) / 2 + travel * (from-end ? 1 - fraction : fraction);
+    property <length> track-size: FluentMetrics.slider-track-size;
+    property <color> track-fill: FluentTheme.high-contrast
+        ? disabled ? FluentTheme.contrast-disabled : FluentTheme.contrast-text
+        : disabled ? FluentTheme.control-strong-fill-disabled : FluentTheme.control-strong-fill;
+    property <color> active-fill: FluentTheme.high-contrast
+        ? disabled ? FluentTheme.contrast-disabled : FluentTheme.contrast-highlight
+        : disabled ? FluentTheme.accent-fill-disabled : pressed ? FluentTheme.accent-fill-pressed
+            : hovered ? FluentTheme.accent-fill-hover : FluentTheme.accent-fill;
+
+    // TickBar lays out marks from the start of the range and skips crowded ticks.
+    // Pointer and keyboard snapping use their own intervals.
+    property <length> tick-pixel: 1phx;
+    property <length> tick-gap: max(1px, travel * min(1, tick-spacing));
+    property <length> visible-tick-gap: tick-gap * max(1, ceil(FluentMetrics.slider-tick-min-spacing / tick-gap));
+    property <int> tick-count: tick-placement != SliderTickPlacement.none && tick-spacing > 0 && travel > 0px
+        ? 1 + floor(travel / visible-tick-gap) : 0;
+
+    Rectangle {
+        width: root.vertical ? root.track-size : parent.width;
+        height: root.vertical ? parent.height : root.track-size;
+        background: root.track-fill;
+        border-radius: root.track-size / 2;
+    }
+
+    Rectangle {
+        property <length> filled: root.from-end ? root.axis-size - root.center : root.center;
+        x: root.vertical ? (root.width - self.width) / 2 : root.from-end ? root.center : 0px;
+        y: root.vertical ? root.from-end ? root.center : 0px : (root.height - self.height) / 2;
+        width: root.vertical ? root.track-size : filled;
+        height: root.vertical ? filled : root.track-size;
+        background: root.active-fill;
+        border-radius: root.track-size / 2;
+    }
+
+    for tick in root.tick-count : Rectangle {
+        property <length> distance: tick * root.visible-tick-gap;
+        property <length> position: (root.axis-size - root.travel - root.tick-pixel) / 2
+            + (root.from-end ? root.travel - distance : distance);
+        property <length> aligned-position: round(position / root.tick-pixel) * root.tick-pixel;
+        property <bool> outside: root.tick-placement == SliderTickPlacement.outside;
+        property <length> tick-length: outside ? FluentMetrics.slider-tick-size : root.track-size;
+        property <length> offset: outside ? root.track-size / 2 + FluentMetrics.slider-tick-gap : -tick-length / 2;
+        x: root.vertical ? root.width / 2 + offset : aligned-position;
+        y: root.vertical ? aligned-position : root.height / 2 + offset;
+        width: root.vertical ? tick-length : root.tick-pixel;
+        height: root.vertical ? root.tick-pixel : tick-length;
+        background: outside ? root.track-fill : FluentTheme.high-contrast
+            ? FluentTheme.contrast-surface : FluentTheme.input-active-fill;
+        if outside : Rectangle {
+            x: root.vertical ? -2 * parent.offset - parent.width : 0px;
+            y: root.vertical ? 0px : -2 * parent.offset - parent.height;
+            width: parent.width;
+            height: parent.height;
+            background: parent.background;
+        }
+    }
+
+    Rectangle {
+        x: root.vertical ? (root.width - self.width) / 2 : root.center - self.width / 2;
+        y: root.vertical ? root.center - self.height / 2 : (root.height - self.height) / 2;
+        property <float> elevation-start: 100% * FluentMetrics.elevation-stop / self.height;
+        property <float> elevation-end: 100% * FluentMetrics.elevation-depth / self.height;
+        property <float> bottom-elevation-start: 100% - elevation-end;
+        property <float> bottom-elevation-end: 100% - elevation-start;
+        width: FluentMetrics.slider-thumb-size + 2 * FluentMetrics.slider-thumb-outset;
+        height: self.width;
+        border-radius: FluentMetrics.slider-thumb-radius;
+        background: FluentTheme.high-contrast ? root.active-fill : FluentTheme.control-solid-fill;
+        border-width: FluentMetrics.control-stroke;
+        border-color: FluentTheme.high-contrast ? root.active-fill : FluentTheme.dark
+            ? @linear-gradient(180deg, FluentTheme.control-stroke-elevated elevation-start, FluentTheme.control-stroke elevation-end)
+            : @linear-gradient(180deg, FluentTheme.control-stroke bottom-elevation-start, FluentTheme.control-stroke-elevated bottom-elevation-end);
+
+        Rectangle {
+            property <float> scale: root.disabled || root.hovered ? 1.167 : root.pressed ? 0.71 : 0.86;
+            animate scale {
+                enabled: FluentMotion.enabled;
+                duration: root.disabled || (!root.hovered && !root.pressed)
+                    ? FluentMotion.control-fast-duration : FluentMotion.control-normal-duration;
+                easing: FluentMotion.control-fast-out-slow-in;
+            }
+            width: FluentMetrics.slider-inner-thumb-size * scale;
+            height: self.width;
+            border-radius: self.width / 2;
+            background: FluentTheme.high-contrast && root.pressed ? FluentTheme.contrast-hotlight : root.active-fill;
+        }
+    }
+
+    if root.focus-visible : FluentFocusRing {
+        width: 100%;
+        height: 100%;
+        horizontal-outset: root.vertical ? FluentMetrics.focus-outset : FluentMetrics.slider-focus-outset;
+    }
+}
+
+export component Slider inherits FocusScope {
+    in property <float> minimum: 0;
+    in property <float> maximum: 100;
+    in-out property <float> value: minimum;
+    in property <float> step-frequency: 1;
+    in property <float> small-change: 1;
+    in property <float> tick-frequency: 0;
+    in property <SliderTickPlacement> tick-placement;
+    in property <bool> snap-to-ticks;
+    in property <Orientation> orientation;
+    in property <bool> direction-reversed;
+    in property <bool> right-to-left;
+    in property <length> minimum-target;
+    callback value-changed(float);
+    out property <ButtonState> state: !self.enabled ? ButtonState.disabled : dragging ? ButtonState.pressed
+        : pointer.pointer-inside ? ButtonState.pointer-over : ButtonState.normal;
+    out property <bool> focus-visible: self.enabled && self.has-focus && keyboard-focus;
+
+    property <bool> keyboard-focus;
+    property <bool> vertical: orientation == Orientation.vertical;
+    property <bool> reversed: direction-reversed != (!vertical && right-to-left);
+    property <float> upper: max(minimum, maximum);
+    property <float> effective-value: clamp(value, minimum, upper);
+    property <float> span: upper - minimum;
+    property <float> tick-spacing: span > 0 && tick-frequency > 0 ? tick-frequency / span : 0;
+    property <length> cross-size: max(FluentMetrics.slider-cross-size, minimum-target);
+    property <length> grab-offset;
+    property <bool> dragging;
+
+    min-width: self.cross-size;
+    min-height: self.cross-size;
+    preferred-width: vertical ? self.cross-size : max(self.cross-size, FluentMetrics.slider-preferred-length);
+    preferred-height: vertical ? max(self.cross-size, FluentMetrics.slider-preferred-length) : self.cross-size;
+    horizontal-stretch: vertical ? 0 : 1;
+    vertical-stretch: vertical ? 1 : 0;
+
+    accessible-role: slider;
+    accessible-enabled: root.enabled;
+    accessible-value: root.effective-value;
+    accessible-value-minimum: root.minimum;
+    accessible-value-maximum: root.upper;
+    accessible-value-step: root.snap-to-ticks && root.tick-frequency > 0 ? root.tick-frequency : max(0, root.small-change);
+    accessible-action-set-value(text) => {
+        if (text.is-float()) { root.commit-value(text.to-float()); }
+    }
+
+    pure function nearest-step(candidate: float, interval: float) -> float {
+        let bounded = clamp(candidate, minimum, upper);
+        if (interval <= 0 || bounded == minimum || bounded == upper) { return bounded; }
+        let next = min(upper, ceil(bounded / interval) * interval);
+        let previous = max(minimum, floor(bounded / interval) * interval);
+        return next - bounded < bounded - previous ? next : previous;
+    }
+
+    function commit-value(candidate: float) {
+        let bounded = clamp(candidate, minimum, upper);
+        if (self.enabled && bounded != effective-value) {
+            value = bounded;
+            value-changed(bounded);
+        }
+    }
+
+    function step(forward: bool) {
+        let interval = snap-to-ticks && tick-frequency > 0 ? tick-frequency : small-change;
+        if (interval <= 0) { return; }
+        let exact-step = effective-value / interval;
+        if (!forward && effective-value == upper && abs(exact-step - round(exact-step)) > 0.000001) {
+            commit-value(floor(exact-step) * interval);
+        } else {
+            commit-value(nearest-step(effective-value + (forward ? interval : -interval), interval));
+        }
+    }
+
+    function move-thumb() {
+        if (surface.travel <= 0px) { return; }
+        let axis = vertical ? pointer.mouse-y : pointer.mouse-x;
+        let ratio = clamp((axis - grab-offset - FluentMetrics.slider-thumb-size / 2) / surface.travel, 0, 1);
+        let position = surface.from-end ? 1 - ratio : ratio;
+        let interval = snap-to-ticks && tick-frequency > 0 ? tick-frequency : step-frequency;
+        commit-value(nearest-step(minimum + span * position, interval));
+    }
+
+    focus-gained(reason) => {
+        if (reason != FocusReason.window-activation) { root.keyboard-focus = reason != FocusReason.pointer-click; }
+    }
+    focus-lost(reason) => {
+        if (reason != FocusReason.window-activation) { root.keyboard-focus = false; }
+    }
+    changed enabled => {
+        if (!root.enabled) { root.dragging = false; }
+    }
+
+    key-pressed(event) => {
+        if (!root.enabled || root.dragging) { return reject; }
+        if (event.text == Key.Home) { root.commit-value(root.minimum); }
+        else if (event.text == Key.End) { root.commit-value(root.upper); }
+        else if (event.text == Key.RightArrow || event.text == Key.LeftArrow) {
+            root.step((event.text == Key.RightArrow) != (root.right-to-left != root.direction-reversed));
+        } else if (event.text == Key.UpArrow || event.text == Key.DownArrow) {
+            root.step((event.text == Key.UpArrow) != root.direction-reversed);
+        } else { return reject; }
+        root.keyboard-focus = true;
+        return accept;
+    }
+
+    surface := SliderSurface {
+        width: 100%;
+        height: 100%;
+        orientation: root.orientation;
+        direction-reversed: root.reversed;
+        fraction: FluentRange.fraction(root.minimum, root.upper, root.value);
+        state: root.state;
+        focus-visible: root.focus-visible;
+        tick-spacing: root.tick-spacing;
+        tick-placement: root.tick-placement;
+    }
+
+    pointer := FluentPointerArea {
+        width: 100%;
+        height: 100%;
+        enabled: root.enabled;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.cancel
+                || (event.kind == PointerEventKind.up && event.button == PointerEventButton.left)) {
+                root.dragging = false;
+            }
+            if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                root.dragging = true;
+                root.focus();
+                root.keyboard-focus = false;
+                let axis = root.vertical ? self.mouse-y : self.mouse-x;
+                let cross = root.vertical ? self.mouse-x - self.width / 2 : self.mouse-y - self.height / 2;
+                let offset = axis - surface.center;
+                let radius = FluentMetrics.slider-thumb-size / 2 + FluentMetrics.slider-thumb-outset;
+                let on-thumb = offset * offset + cross * cross <= radius * radius;
+                root.grab-offset = on-thumb ? offset : 0px;
+                if (!on-thumb) { root.move-thumb(); }
+            }
+        }
+        moved => {
+            if (self.enabled && root.dragging) { root.move-thumb(); }
+        }
+    }
+}

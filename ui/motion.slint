@@ -1,0 +1,30 @@
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export global FluentMotion {
+    out property <bool> enabled: !FluentTheme.reduced-motion && !FluentTheme.high-contrast;
+    out property <duration> control-fill-duration: enabled ? FluentMetrics.control-fill-duration : 0ms;
+    out property <easing> control-fill-easing: linear;
+    // AnimatedAcceptVisualSource trims the stroke over 19 frames at 60 Hz,
+    // or 9 frames when the pointer remains pressed. Erasure takes 4 frames.
+    out property <duration> check-mark-enter: 19 * 1s / 60;
+    out property <duration> check-mark-enter-pressed: 9 * 1s / 60;
+    out property <duration> check-mark-exit: 4 * 1s / 60;
+    out property <easing> check-mark-enter-easing: cubic-bezier(0.55, 0, 0, 1);
+    out property <duration> control-normal-duration: 250ms;
+    out property <duration> control-fast-duration: 167ms;
+    out property <easing> control-fast-out-slow-in: cubic-bezier(0, 0, 0, 1);
+    out property <duration> progress-cycle: 2s;
+    out property <duration> progress-bar-first-sweep: 1500ms;
+    out property <duration> progress-bar-second-delay: 750ms;
+
+    // Sample cubic-bezier(0.4, 0, 0.6, 1) at normalized time x.
+    public pure function progress-bar-ease(x: float) -> float {
+        let t = invert-progress-spline(x, x);
+        let u = invert-progress-spline(x, t);
+        return u * u * (3 - 2 * u);
+    }
+
+    pure function invert-progress-spline(x: float, t: float) -> float {
+        return t - (t * (1.2 + t * (-0.6 + 0.4 * t)) - x) / (1.2 + t * (-1.2 + 1.2 * t));
+    }
+}

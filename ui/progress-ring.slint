@@ -1,0 +1,95 @@
+import { FluentMotion } from "motion.slint";
+import { FluentIcon } from "primitives.slint";
+import { FluentRange } from "range.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export component ProgressRing {
+    in property <float> minimum: 0;
+    in property <float> maximum: 100;
+    in property <float> value: minimum;
+    in property <bool> active: true;
+    in property <bool> indeterminate: true;
+    // Bind to the host's foreground/visibility state when it manages a page or window.
+    in property <bool> animations-enabled: true;
+    in property <string> label;
+    in property <color> track-color: FluentTheme.high-contrast ? FluentTheme.contrast-text : transparent;
+    in property <color> indicator-color: FluentTheme.high-contrast ? FluentTheme.contrast-highlight : FluentTheme.accent-fill;
+
+    property <length> diameter: min(self.width, self.height);
+    property <float> radius: indeterminate ? FluentMetrics.progress-ring-indeterminate-radius
+        : FluentMetrics.progress-ring-determinate-radius;
+    property <float> stroke-ratio: indeterminate ? FluentMetrics.progress-ring-indeterminate-stroke
+        : FluentMetrics.progress-ring-determinate-stroke;
+    property <length> stroke: diameter * stroke-ratio;
+    property <bool> motion: animations-enabled && self.visible && active && FluentMotion.enabled;
+    property <float> phase: motion && indeterminate ? mod(animation-tick(), FluentMotion.progress-cycle) / FluentMotion.progress-cycle : 0;
+    property <float> progress: FluentRange.fraction(minimum, maximum, value);
+    property <float> target-progress;
+    property <float> displayed-progress: target-progress;
+    property <duration> progress-duration;
+    property <float> arc-length: !indeterminate ? (motion ? displayed-progress : progress)
+        : motion ? 0.5 - abs(phase - 0.5) : 0.25;
+    property <angle> arc-start: indeterminate && motion ? (phase * 2.5 + max(0, phase - 0.5)) * 360deg : 0deg;
+
+    init => { root.target-progress = root.progress; }
+    changed progress => {
+        root.progress-duration = max(0, root.progress - root.target-progress) * FluentMotion.progress-cycle;
+        root.target-progress = root.progress;
+    }
+    animate displayed-progress {
+        enabled: root.motion && !root.indeterminate && root.progress-duration > 0ms;
+        duration: root.progress-duration;
+        easing: linear;
+    }
+
+    min-width: FluentMetrics.progress-ring-min-size;
+    min-height: FluentMetrics.progress-ring-min-size;
+    preferred-width: FluentMetrics.progress-ring-size;
+    preferred-height: FluentMetrics.progress-ring-size;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    if root.active : Rectangle {
+        width: root.diameter;
+        height: self.width;
+        accessible-role: progress-indicator;
+        accessible-label: root.label;
+        accessible-value: root.indeterminate ? "" : clamp(root.value, root.minimum, max(root.minimum, root.maximum));
+        accessible-value-minimum: root.minimum;
+        accessible-value-maximum: max(root.minimum, root.maximum);
+        accessible-description: root.indeterminate ? "In progress" : "";
+
+        Rectangle {
+            width: root.diameter * 2 * root.radius + root.stroke;
+            height: self.width;
+            border-radius: self.width / 2;
+            border-width: root.stroke;
+            border-color: root.arc-length >= 1 ? root.indicator-color : root.track-color;
+        }
+
+        if root.arc-length > 0 && root.arc-length < 1 : FluentIcon {
+            property <angle> end-angle: root.arc-start + root.arc-length * 360deg;
+            // Path reserves half the stroke on each edge before fitting the viewbox.
+            viewbox-x: root.stroke-ratio / 2;
+            viewbox-y: self.viewbox-x;
+            viewbox-width: 1 - root.stroke-ratio;
+            viewbox-height: self.viewbox-width;
+            stroke: root.indicator-color;
+            stroke-width: root.stroke;
+            stroke-line-cap: round;
+
+            MoveTo {
+                x: 0.5 + root.radius * sin(root.arc-start);
+                y: 0.5 - root.radius * cos(root.arc-start);
+            }
+            ArcTo {
+                radius-x: root.radius;
+                radius-y: root.radius;
+                x: 0.5 + root.radius * sin(parent.end-angle);
+                y: 0.5 - root.radius * cos(parent.end-angle);
+                sweep: true;
+                large-arc: root.arc-length > 0.5;
+            }
+        }
+    }
+}

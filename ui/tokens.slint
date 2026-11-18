@@ -1,0 +1,151 @@
+export enum FluentColorScheme { light, dark, high-contrast }
+
+export global FluentMetrics {
+    out property <length> control-radius: 4px;
+    out property <length> overlay-radius: 8px;
+    out property <length> control-stroke: 1px;
+    out property <length> focus-outset: 3px;
+    out property <length> focus-outer-stroke: 2px;
+    out property <length> focus-inner-stroke: 1px;
+    out property <length> elevation-depth: 3px;
+    out property <length> elevation-stop: 1px;
+    out property <length> base-font-size: 14px;
+    out property <length> scaled-font-size: base-font-size * FluentTheme.text-scale;
+    out property <relative-font-size> caption-size: 12rem / 14;
+    out property <relative-font-size> body-size: 1rem;
+    out property <relative-font-size> title-size: 2rem;
+    out property <int> regular-weight: 400;
+    out property <int> strong-weight: 600;
+    out property <length> spacing-small: 4px;
+    out property <length> spacing-medium: 8px;
+    out property <length> spacing-large: 16px;
+    out property <length> spacing-page: 24px;
+    out property <length> compact-width: 400px;
+    out property <length> touch-target: 44px;
+    out property <length> surface-shadow-blur: 8px;
+    out property <length> surface-shadow-offset: 2px;
+    out property <length> acrylic-preview-blur: 12px;
+    out property <length> button-padding-horizontal: 11px;
+    out property <length> button-padding-top: 5px;
+    out property <length> button-padding-bottom: 6px;
+    out property <length> text-box-min-width: 64px;
+    out property <length> text-box-min-height: 32px;
+    out property <length> text-box-padding-left: 10px;
+    out property <length> text-box-padding-top: 5px;
+    out property <length> text-box-padding-right: 6px;
+    out property <length> text-box-padding-bottom: 6px;
+    out property <length> text-box-focus-stroke: 2px;
+    out property <length> text-box-elevation-depth: 2px;
+    out property <length> text-box-clear-inset: 4px;
+    out property <length> text-box-clear-icon-size: 12px;
+    out property <float> text-box-clear-min-width-em: 5;
+    out property <length> text-cursor-width: 1px;
+    out property <length> check-box-size: 20px;
+    out property <length> check-box-min-width: 120px;
+    out property <length> check-box-min-height: 32px;
+    out property <length> check-box-label-gap: 8px;
+    out property <length> check-box-label-top: 5px;
+    out property <length> check-box-glyph-size: 12px;
+    out property <length> check-box-glyph-stroke: 1.5px;
+    out property <length> check-box-glyph-offset: 1px;
+    out property <length> check-box-focus-outset: 7px;
+    out property <length> radio-ring-size: 20px;
+    out property <length> radio-min-width: 120px;
+    out property <length> radio-min-height: 32px;
+    out property <length> radio-label-gap: 8px;
+    out property <length> radio-label-top: 6px;
+    out property <length> radio-focus-outset: 7px;
+    out property <length> radio-dot-size: 12px;
+    out property <length> radio-hover-dot-size: 14px;
+    out property <length> radio-pressed-dot-size: 10px;
+    out property <length> radio-dot-start-size: 4px;
+    out property <length> radio-column-spacing: 7px;
+    out property <length> slider-cross-size: 32px;
+    out property <length> slider-preferred-length: 200px;
+    out property <length> slider-thumb-size: 18px;
+    out property <length> slider-thumb-outset: 2px;
+    out property <length> slider-thumb-radius: 10px;
+    out property <length> slider-inner-thumb-size: 12px;
+    out property <length> slider-track-size: FluentTheme.high-contrast ? 2px : 4px;
+    out property <length> slider-tick-size: 4px;
+    out property <length> slider-tick-gap: 4px;
+    out property <length> slider-tick-min-spacing: 20px;
+    out property <length> slider-focus-outset: 7px;
+    out property <length> progress-bar-size: 3px;
+    out property <length> progress-bar-track-size: 1px;
+    out property <length> progress-ring-min-size: 16px;
+    out property <length> progress-ring-size: 32px;
+    out property <float> progress-ring-determinate-radius: 8 * 1.77 / 32;
+    out property <float> progress-ring-determinate-stroke: 1.5 * 1.77 / 32;
+    out property <float> progress-ring-indeterminate-radius: 35 / 80;
+    out property <float> progress-ring-indeterminate-stroke: 7.5 / 80;
+    out property <duration> control-fill-duration: 83ms;
+}
+
+export global FluentTheme {
+    in-out property <FluentColorScheme> scheme: FluentColorScheme.light;
+    in property <color> light-accent: #005fb8;
+    in property <color> dark-accent: #60cdff;
+    in property <bool> reduced-motion: false;
+    in property <float> text-scale: 1;
+
+    // Hosts can supply an operating system's contrast palette.
+    in property <color> contrast-surface: #000000;
+    in property <color> contrast-text: #ffffff;
+    in property <color> contrast-disabled: #a6a6a6;
+    in property <color> contrast-highlight: #ffff00;
+    in property <color> contrast-highlight-text: #000000;
+    in property <color> contrast-hotlight: contrast-highlight;
+    in property <color> contrast-button-face: contrast-surface;
+    in property <color> contrast-button-text: contrast-text;
+
+    out property <bool> dark: scheme == FluentColorScheme.dark;
+    out property <bool> high-contrast: scheme == FluentColorScheme.high-contrast;
+    out property <color> page: high-contrast ? contrast-surface : dark ? #202020 : #f3f3f3;
+    out property <color> page-alt: high-contrast ? contrast-surface : dark ? #0a0a0a : #dadada;
+    out property <color> card-fill: high-contrast ? contrast-surface : dark ? #ffffff0d : #ffffffb3;
+    out property <color> card-stroke: high-contrast ? contrast-text : dark ? #00000019 : #0000000f;
+    out property <color> acrylic-fallback: high-contrast ? contrast-surface : dark ? #2c2c2c : #f9f9f9;
+    out property <color> acrylic-preview-tint: dark ? #2c2c2cf5 : #fcfcfcd9;
+    out property <color> surface-shadow: high-contrast ? #0000 : dark ? #00000052 : #00000026;
+    out property <color> text-primary: high-contrast ? contrast-text : dark ? #ffffff : #000000e4;
+    out property <color> text-secondary: high-contrast ? contrast-text : dark ? #ffffffc5 : #0000009e;
+    out property <color> text-tertiary: high-contrast ? contrast-text : dark ? #ffffff87 : #00000072;
+    out property <color> text-disabled: high-contrast ? contrast-disabled : dark ? #ffffff5d : #0000005c;
+
+    out property <color> control-fill: dark ? #ffffff0f : #ffffffb3;
+    out property <color> control-fill-hover: dark ? #ffffff15 : #f9f9f980;
+    out property <color> control-fill-pressed: dark ? #ffffff08 : #f9f9f94d;
+    out property <color> control-fill-disabled: dark ? #ffffff0b : #f9f9f94d;
+    out property <color> control-stroke: dark ? #ffffff12 : #0000000f;
+    out property <color> control-stroke-elevated: dark ? #ffffff18 : #00000029;
+    out property <color> control-strong-stroke: dark ? #ffffff8b : #00000072;
+    out property <color> control-strong-stroke-disabled: dark ? #ffffff28 : #00000037;
+    out property <color> control-strong-fill: dark ? #ffffff8b : #00000072;
+    out property <color> control-strong-fill-disabled: dark ? #ffffff3f : #00000051;
+    out property <color> control-solid-fill: dark ? #454545 : #ffffff;
+    out property <color> system-caution: dark ? #fce100 : #9d5d00;
+    out property <color> system-critical: dark ? #ff99a4 : #c42b1c;
+    out property <color> control-alt-fill: dark ? #00000019 : #00000006;
+    out property <color> control-alt-fill-hover: dark ? #ffffff0b : #0000000f;
+    out property <color> control-alt-fill-pressed: dark ? #ffffff12 : #00000018;
+
+    out property <color> input-active-fill: dark ? #1e1e1eb3 : #ffffff;
+    out property <color> input-strong-stroke: control-strong-stroke;
+    out property <color> input-disabled-text: high-contrast ? text-disabled : dark ? #fefefe5d : #0101015c;
+
+    out property <color> subtle-fill-hover: dark ? #ffffff0f : #00000009;
+    out property <color> subtle-fill-pressed: dark ? #ffffff0a : #00000006;
+    out property <color> accent-fill: dark ? dark-accent : light-accent;
+    out property <color> accent-fill-hover: accent-fill.transparentize(0.1);
+    out property <color> accent-fill-pressed: accent-fill.transparentize(0.2);
+    out property <color> accent-fill-disabled: dark ? #ffffff28 : #00000037;
+    out property <color> accent-stroke: #ffffff14;
+    out property <color> accent-stroke-elevated: dark ? #00000023 : #00000066;
+    out property <color> accent-text: dark ? #000000 : #ffffff;
+    out property <color> accent-text-pressed: dark ? #00000080 : #ffffffb3;
+    out property <color> accent-text-disabled: dark ? #ffffff87 : #ffffff;
+
+    out property <color> focus-outer: high-contrast ? contrast-text : dark ? #ffffff : #000000e4;
+    out property <color> focus-inner: high-contrast ? contrast-surface : dark ? #000000b3 : #ffffffb3;
+}

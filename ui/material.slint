@@ -1,0 +1,23 @@
+import { FluentSurface } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export enum FluentMaterial { solid-fallback, mica, acrylic, mica-alt, desktop-acrylic }
+
+export global FluentMaterials {
+    // Always opaque. A host can use this from the first frame through any
+    // native backdrop failure or change in the contrast preference.
+    pure public function fallback-color(material: FluentMaterial) -> color {
+        return (material == FluentMaterial.acrylic || material == FluentMaterial.desktop-acrylic) ? FluentTheme.acrylic-fallback
+            : material == FluentMaterial.mica-alt ? FluentTheme.page-alt : FluentTheme.page;
+    }
+}
+
+export component FluentInAppAcrylic inherits FluentSurface {
+    // The host opts in when the renderer and transparency policy allow blur.
+    in property <bool> blur-enabled;
+    property <bool> use-blur: blur-enabled && !FluentTheme.high-contrast;
+
+    border-radius: FluentMetrics.overlay-radius;
+    background: use-blur ? FluentTheme.acrylic-preview-tint : FluentMaterials.fallback-color(FluentMaterial.acrylic);
+    backdrop-blur: use-blur ? FluentMetrics.acrylic-preview-blur : 0px;
+}
