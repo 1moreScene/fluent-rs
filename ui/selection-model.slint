@@ -1,0 +1,98 @@
+import { ItemData } from "item-presenter.slint";
+
+export enum ListDirection { first, last, next, previous }
+export enum ListSelectionMode { single, multiple, extended, none }
+
+export global SelectionLogic {
+    pure callback target([ItemData], int, ListDirection) -> int;
+    pure callback contains([int], int) -> bool;
+    pure callback update([int], int, bool) -> [int];
+    pure callback range([ItemData], [int], int, int) -> [int];
+    pure callback equal([int], [int]) -> bool;
+}
+
+// Bindings use row indices. Hosts clear or reapply selection when reordering rows in place.
+export component SelectionModel {
+    in property <[ItemData]> items;
+    in property <ListSelectionMode> mode;
+    out property <[int]> selected;
+    out property <int> selected-index: root.selected.length > 0 ? root.selected[0] : -1;
+    callback changed-by-user;
+
+    property <int> anchor: -1;
+    property <int> item-count: root.items.length;
+
+    changed items => { root.clear(); }
+    changed item-count => { root.clear(); }
+    changed mode => {
+        root.anchor = root.selected-index;
+        if (root.mode == ListSelectionMode.none) { root.clear(); }
+        else if (root.mode == ListSelectionMode.single && root.selected.length > 1) {
+            root.selected = [ root.selected-index ];
+        }
+    }
+
+    public pure function enabled(index: int) -> bool {
+        return index >= 0 && index < root.items.length && !root.items[index].disabled;
+    }
+
+    public function clear() {
+        root.selected = [];
+        root.anchor = -1;
+    }
+
+    public function set-index(index: int) {
+        if (index == -1) { root.clear(); }
+        else if (root.mode != ListSelectionMode.none && root.enabled(index)) {
+            root.selected = [ index ];
+            root.anchor = index;
+        }
+    }
+
+    public function mark-anchor(index: int) {
+        if (root.enabled(index)) { root.anchor = index; }
+    }
+
+    public function activate(index: int, toggle: bool) {
+        if (root.mode != ListSelectionMode.none && root.enabled(index)) {
+            root.anchor = index;
+            if (toggle && root.mode == ListSelectionMode.single && root.selected-index == index) {
+                root.clear();
+                root.changed-by-user();
+            } else if (root.selected.length != 1 || root.selected-index != index || toggle) {
+                root.selected = SelectionLogic.update(root.selected, index, toggle && root.mode != ListSelectionMode.single);
+                root.changed-by-user();
+            }
+        }
+    }
+
+    public function extend(index: int, from: int, additive: bool) {
+        if (root.mode != ListSelectionMode.none && root.enabled(index)) {
+            if (!root.enabled(root.anchor)) {
+                root.anchor = root.enabled(from) ? from : index;
+            }
+            root.apply(SelectionLogic.range(root.items, additive ? root.selected : [], root.anchor, index));
+        }
+    }
+
+    public function select-all() {
+        if (root.mode == ListSelectionMode.multiple || root.mode == ListSelectionMode.extended) {
+            root.apply(SelectionLogic.range(root.items, [], 0, root.items.length - 1));
+        }
+    }
+
+    public function toggle-all() {
+        if (root.mode == ListSelectionMode.none) { return; }
+        let next = SelectionLogic.range(root.items, [], 0, root.items.length - 1);
+        if (next.length > 0) {
+            root.apply(SelectionLogic.equal(root.selected, next) ? [] : next);
+        }
+    }
+
+    function apply(next: [int]) {
+        if (!SelectionLogic.equal(root.selected, next)) {
+            root.selected = next;
+            root.changed-by-user();
+        }
+    }
+}

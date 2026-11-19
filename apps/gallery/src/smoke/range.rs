@@ -146,11 +146,7 @@ pub(super) fn verify(gallery: &GalleryWindow) -> Result<(), Box<dyn Error>> {
         gallery.get_vertical_slider_value() == 40.,
         "Vertical Slider steps down by a tick",
     )?;
-    window.dispatch_event(WindowEvent::PointerScrolled {
-        position: target,
-        delta_x: 0.,
-        delta_y: 2000.,
-    });
+    gallery.invoke_scroll_range_to_top();
     verify_progress(gallery)
 }
 
@@ -235,6 +231,7 @@ pub(super) fn verify_compact(
     window_width: f32,
 ) -> Result<(), Box<dyn Error>> {
     gallery.set_page(GalleryPage::Ranges);
+    gallery.invoke_scroll_range_to_top();
     let _ = gallery.window().take_snapshot()?;
     let slider = gallery.get_slider_bounds();
     check(
@@ -259,6 +256,8 @@ pub(super) fn verify_motion(
     done: impl FnOnce(Result<(), Box<dyn Error>>) + 'static,
 ) {
     gallery.set_page(GalleryPage::Ranges);
+    // The compact page may retain an earlier scroll or focus adjustment.
+    gallery.invoke_scroll_range_to_top();
     gallery.invoke_select_theme(FluentColorScheme::Light);
     gallery.set_progress_indeterminate(true);
     gallery.global::<FluentTheme>().set_reduced_motion(false);
@@ -370,9 +369,19 @@ fn indicators(gallery: &GalleryWindow) -> Result<IndicatorPixels, Box<dyn Error>
     let window = gallery.window();
     let scale = window.scale_factor();
     let frame = window.take_snapshot()?;
+    let viewport = gallery.get_range_viewport_bounds();
+    let viewport_start = point(&viewport, 0., 0.).to_physical(scale);
+    let viewport_end = point(&viewport, 1., 1.).to_physical(scale);
     let sample = |bounds: RangeBounds| -> Result<Vec<_>, Box<dyn Error>> {
         let start = point(&bounds, 0., 0.).to_physical(scale);
         let end = point(&bounds, 1., 1.).to_physical(scale);
+        check(
+            start.x >= viewport_start.x
+                && start.y >= viewport_start.y
+                && end.x <= viewport_end.x
+                && end.y <= viewport_end.y,
+            "Progress sample lies inside the Range page viewport",
+        )?;
         check(
             start.x >= 0
                 && start.y >= 0

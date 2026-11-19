@@ -1,0 +1,129 @@
+import { ButtonSurface } from "button-surface.slint";
+import { Flyout, OverlayPlacement } from "flyout.slint";
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { ButtonState, FluentPressable } from "interaction.slint";
+import { OverlayArea } from "overlay-host.slint";
+import { FluentText } from "primitives.slint";
+import { SplitChevron } from "split-chevron.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export component DropDownButton inherits FocusScope {
+    in property <string> text;
+    in property <image> icon;
+    in property <string> accessible-name: root.text;
+    in property <bool> active: true;
+    in property <length> minimum-target;
+    in property <OverlayArea> viewport;
+    in property <OverlayPlacement> placement: OverlayPlacement.bottom;
+    in property <length> flyout-width: FluentMetrics.flyout-min-width;
+    in property <length> flyout-height: FluentMetrics.flyout-min-height;
+    in property <bool> focus-flyout-content;
+    in property <bool> menu-presentation;
+    out property <bool> open: flyout.open;
+    out property <bool> button-focused: trigger.has-focus;
+    out property <bool> focus-visible: trigger.focus-visible;
+    out property <ButtonState> state: root.touch-input && trigger.state == ButtonState.pointer-over
+        ? ButtonState.normal : trigger.state;
+    out property <float> chevron-progress: arrow.progress;
+    out property <OverlayArea> bounds: {
+        x: root.absolute-position.x, y: root.absolute-position.y,
+        width: root.width, height: root.height,
+    };
+    out property <OverlayArea> panel-bounds: flyout.panel-bounds;
+
+    property <bool> operable: root.active && root.enabled;
+    property <bool> touch-input;
+
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+    min-width: surface.min-width;
+    min-height: surface.min-height;
+    preferred-width: surface.preferred-width;
+    preferred-height: surface.preferred-height;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    public function open-flyout() {
+        if (root.operable && !root.open) {
+            trigger.focus();
+            flyout.show();
+        }
+    }
+
+    public function dismiss-flyout() { flyout.dismiss(); }
+
+    trigger := FluentPressable {
+        width: 100%;
+        height: 100%;
+        enabled: root.operable;
+        focus-on-press: true;
+        accessible-role: button;
+        accessible-label: root.accessible-name;
+        accessible-enabled: self.enabled;
+        accessible-expandable: true;
+        accessible-expanded: root.open;
+        accessible-action-default => { root.open-flyout(); }
+        accessible-action-expand => { root.open-flyout(); }
+        activated => { root.open-flyout(); }
+
+        pointer-interaction(event, position) => {
+            if (event.kind == PointerEventKind.down || event.kind == PointerEventKind.move) {
+                root.touch-input = event.touch-finger-id != 0;
+            }
+        }
+
+        surface := ButtonSurface {
+            width: 100%;
+            height: 100%;
+            minimum-target: root.minimum-target;
+            state: root.state;
+            contrast-fill: self.state == ButtonState.pointer-over || self.state == ButtonState.pressed
+                ? FluentTheme.contrast-highlight-text : FluentTheme.contrast-button-face;
+            contrast-foreground: self.state == ButtonState.disabled ? FluentTheme.contrast-disabled
+                : self.state == ButtonState.normal ? FluentTheme.contrast-button-text : FluentTheme.contrast-highlight;
+            contrast-border: self.state == ButtonState.pointer-over ? FluentTheme.contrast-highlight
+                : self.state == ButtonState.pressed ? FluentTheme.contrast-highlight-text : transparent;
+            focus-visible: trigger.focus-visible && !root.open;
+
+            content << HorizontalLayout {
+                alignment: center;
+                spacing: FluentMetrics.spacing-medium;
+                if root.icon.width > 0 : FluentSystemIcon {
+                    source: root.icon;
+                    foreground: surface.content-foreground;
+                }
+                if root.text != "" : FluentText {
+                    text: root.text;
+                    color: surface.content-foreground;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+                arrow := SplitChevron {
+                    hovered: surface.state == ButtonState.pointer-over;
+                    pressed: surface.state == ButtonState.pressed;
+                    foreground: surface.state == ButtonState.disabled ? FluentTheme.text-disabled
+                        : FluentTheme.high-contrast ? (surface.state == ButtonState.normal
+                            ? FluentTheme.contrast-button-text : FluentTheme.contrast-highlight)
+                        : surface.state == ButtonState.normal ? FluentTheme.text-secondary : FluentTheme.text-tertiary;
+                }
+            }
+        }
+    }
+
+    flyout := Flyout {
+        active: root.operable;
+        viewport: root.viewport;
+        anchor: root.bounds;
+        placement: root.placement;
+        center-on-anchor: false;
+        viewport-inset: FluentMetrics.spacing-small;
+        anchor-gap: FluentMetrics.spacing-small;
+        requested-width: root.flyout-width;
+        requested-height: root.flyout-height;
+        focus-content: root.focus-flyout-content;
+        theme-transition: true;
+        menu-presentation: root.menu-presentation;
+        @children
+    }
+}

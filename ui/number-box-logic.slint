@@ -1,0 +1,22 @@
+export enum NumberBoxAction { refresh, commit, restore, minimum-changed, maximum-changed, settings-changed, increase, decrease, page-increase, page-decrease }
+export enum NumberBoxSpinButtonPlacement { hidden, compact, inline }
+export enum NumberBoxValidationMode { invalid-input-overwritten, disabled }
+
+// Canonical round-trip f64 strings keep Slint's f32 representation out of numeric state.
+export struct NumberBoxRequest {
+    value: string, text: string, minimum: string, maximum: string,
+    external-value: bool,
+    small-change: string, large-change: string, validation-disabled: bool,
+    wrap: bool, accepts-expression: bool, decimal-separator: string, minimum-fraction-digits: int,
+}
+export struct NumberBoxResult {
+    value: string, text: string, minimum: string, maximum: string,
+    up-enabled: bool, down-enabled: bool, error: string,
+    accessible-minimum:float,accessible-maximum:float,accessible-step:float,
+}
+export global NumberBoxLogic {
+    in-out property <bool> ready;
+    pure callback evaluate(NumberBoxRequest, NumberBoxAction) -> NumberBoxResult;
+    pure callback equal(string, string) -> bool;
+    pure callback byte-length(string) -> int;
+}

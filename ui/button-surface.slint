@@ -7,13 +7,27 @@ export { ButtonState }
 export enum ButtonVariant { standard, accent, subtle }
 
 // Shared by the interactive Button and the non-interactive Gallery samples.
-export component ButtonSurface {
+export component ButtonSurface inherits Rectangle {
+    slot content << FluentText {
+        text: root.text;
+        color: root.content-foreground;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        wrap: root.wrap-text ? word-wrap : no-wrap;
+        overflow: elide;
+        accessible-role: none;
+    }
+
     in property <string> text;
+    out property <color> content-foreground: root.foreground();
     in property <ButtonVariant> variant;
     in property <ButtonState> state;
     in property <bool> focus-visible;
     in property <bool> wrap-text;
     in property <length> minimum-target;
+    in property <length> horizontal-padding: FluentMetrics.button-padding-horizontal;
+    in property <length> top-padding: FluentMetrics.button-padding-top;
+    in property <length> bottom-padding: FluentMetrics.button-padding-bottom;
     in property <color> contrast-fill: pressed ? FluentTheme.contrast-highlight-text
         : hovered || (accent && !disabled) ? FluentTheme.contrast-highlight : FluentTheme.contrast-surface;
     in property <color> contrast-foreground: disabled ? FluentTheme.contrast-disabled
@@ -107,21 +121,13 @@ export component ButtonSurface {
     }
 
     label-layout := VerticalLayout {
-        padding-left: FluentMetrics.button-padding-horizontal + root.stroke;
+        padding-left: root.horizontal-padding + root.stroke;
         padding-right: self.padding-left;
-        padding-top: FluentMetrics.button-padding-top + root.stroke;
-        padding-bottom: FluentMetrics.button-padding-bottom + root.stroke;
+        padding-top: root.top-padding + root.stroke;
+        padding-bottom: root.bottom-padding + root.stroke;
         alignment: center;
 
-        FluentText {
-            text: root.text;
-            color: root.foreground();
-            horizontal-alignment: center;
-            vertical-alignment: center;
-            wrap: root.wrap-text ? word-wrap : no-wrap;
-            overflow: elide;
-            accessible-role: none;
-        }
+        content { }
     }
 
     if root.focus-visible && !root.disabled : FluentFocusRing {

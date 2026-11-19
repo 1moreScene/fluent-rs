@@ -1,0 +1,5 @@
+{
+  "edition": "1.19",
+  "main": "ui/gallery.slint",
+  "experimental-features": ["named-slots"]
+}

@@ -1,0 +1,46 @@
+import { ItemAppearance, ItemData, ItemDecoration } from "item-presenter.slint";
+import { SelectableList } from "selectable-list.slint";
+import { FluentMetrics } from "tokens.slint";
+
+export component MenuPresenter inherits FocusScope {
+    in property <[ItemData]> items;
+    in property <[ItemDecoration]> decorations;
+    in property <string> label;
+    in property <length> minimum-target;
+    callback focus-changed(int, bool);
+    callback dismiss;
+    callback invoked(int);
+
+    x: 0px;
+    y: 0px;
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+
+    key-pressed(event) => {
+        if (event.text == Key.Tab || event.text == Key.Backtab) { root.dismiss(); }
+        return reject;
+    }
+
+    SelectableList {
+        x: FluentMetrics.flyout-border-width;
+        y: FluentMetrics.menu-presenter-inset;
+        width: max(0px, parent.width - 2 * self.x);
+        height: max(0px, parent.height - 2 * self.y);
+        framed: false;
+        scroll-bar-outset: FluentMetrics.menu-presenter-vertical-padding;
+        item-appearance: ItemAppearance.menu;
+        items: root.items;
+        decorations: root.decorations;
+        label: root.label;
+        minimum-target: root.minimum-target;
+        row-height: FluentMetrics.menu-row-height(root.minimum-target);
+        wrap-navigation: true;
+        focus-on-init: true;
+        focus-row-changed(index) => { root.focus-changed(index, self.row-focus-visible); }
+        changed row-focus-visible => { root.focus-changed(self.focused-row, self.row-focus-visible); }
+        row-activated(index, from, control, shift, keyboard) => {
+            root.dismiss();
+            root.invoked(index);
+        }
+    }
+}

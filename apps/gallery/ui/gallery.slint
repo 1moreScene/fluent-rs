@@ -1,7 +1,53 @@
+import { SelectorBarPage, SelectorBarProbe } from "selector-bar-page.slint";
+import { PipsPagerPage, PipsPagerProbe, PipsPagerButtonVisibility } from "pips-pager-page.slint";
+export { PipsPagerButtonVisibility }
+import { GridViewPage, GridViewProbe } from "grid-view-page.slint";
+import { NumberBoxPage, NumberProbe } from "number-box-page.slint";
+import { PersonPicturePage, PersonProbe } from "person-picture-page.slint";
+import { NumberBoxLogic, NumberBoxRequest, NumberBoxResult, NumberBoxAction, NumberBoxSpinButtonPlacement, NumberBoxValidationMode } from "../../../ui/number-box-logic.slint";
+import { PersonPictureLogic, PersonPictureState } from "../../../ui/person-picture.slint";
+export { NumberProbe, PersonProbe, NumberBoxLogic, NumberBoxRequest, NumberBoxResult, NumberBoxAction, NumberBoxSpinButtonPlacement, NumberBoxValidationMode, PersonPictureLogic, PersonPictureState }
+import { GridNavigation } from "../../../ui/grid-view.slint";
+export { GridNavigation }
+import { DropDownButtonPage, DropDownProbe } from "drop-down-button-page.slint";
+import { ToggleSplitButtonPage, ToggleSplitProbe } from "toggle-split-button-page.slint";
+import { ExpanderPage, ExpanderProbe } from "expander-page.slint";
+import { RepeatButtonPage, RepeatButtonProbe } from "repeat-button-page.slint";
+import { HyperlinkButtonPage, HyperlinkProbe, UriLauncher } from "hyperlink-button-page.slint";
+import { ButtonClickMode } from "../../../ui/interaction.slint";
+export { RepeatButtonProbe, HyperlinkProbe, UriLauncher, ButtonClickMode }
+import { SplitButtonPage, SplitButtonProbe } from "split-button-page.slint";
+import { SplitChevronMotion } from "../../../ui/split-chevron.slint";
+export { SplitChevronMotion }
+import { TreeViewPage, TreeViewProbe } from "tree-view-page.slint";
+import { PasswordBoxPage, PasswordProbe } from "password-box-page.slint";
+import { ToggleSwitchPage, SwitchProbe } from "toggle-switch-page.slint";
+import { PasswordRevealMode } from "../../../ui/password-box.slint";
+export { PasswordProbe, SwitchProbe, PasswordRevealMode }
+import { CommandBarPage, CommandBarProbe } from "command-bar-page.slint";
+import { TreeLogic, TreeNode, TreeProjection, TreeChecks } from "../../../ui/tree-view.slint";
+import { CommandBarLogic, CommandBarItem, CommandBarLayout, CommandBarMeasure, CommandBarMenu } from "../../../ui/command-bar.slint";
+import { ItemDecoration } from "../../../ui/item-presenter.slint";
+export { TreeLogic, TreeNode, TreeProjection, TreeChecks, CommandBarLogic, CommandBarItem, CommandBarLayout, CommandBarMeasure, CommandBarMenu, ItemDecoration }
+import { FluentPopupMotion, PopupMotionProfile, PopupMotionTrack } from "../../../ui/popup-motion.slint";
+import { AutoSuggestText, AutoSuggestionTextChangeReason } from "../../../ui/auto-suggest-box.slint";
+export { AutoSuggestText, AutoSuggestionTextChangeReason }
+import { AutoSuggestBoxPage, SuggestProbe } from "auto-suggest-box-page.slint";
+export { SuggestProbe }
+export { FluentPopupMotion, PopupMotionProfile, PopupMotionTrack }
+export { AcrylicBackdrop, AcrylicCapture }
+import { AnimatedIconLogic, AnimationMarker, AnimationSegment } from "../../../ui/animated-icon.slint";
+import { ChevronAnimation, ChevronPose } from "../../../ui/navigation-chevron.slint";
+export { AnimatedIconLogic, AnimationMarker, AnimationSegment, ChevronAnimation, ChevronPose }
+import { ComboPopupGeometry, ComboPopupLayout } from "../../../ui/combo-popup-layout.slint";
+export { ComboPopupGeometry, ComboPopupLayout }
+import { ComboTextMatch, ComboTextSearch } from "../../../ui/combo-text-search.slint";
+export { ComboTextMatch, ComboTextSearch }
 import { Button, ButtonState, ButtonVariant } from "../../../ui/button.slint";
+import { FluentFocus } from "../../../ui/interaction.slint";
 import { TextBoxState } from "../../../ui/text-box.slint";
 import { FluentColorScheme, FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
-import { FluentMaterial, FluentMaterials } from "../../../ui/material.slint";
+import { AcrylicBackdrop, AcrylicCapture, FluentMaterial, FluentMaterials } from "../../../ui/material.slint";
 import { FluentMotion } from "../../../ui/motion.slint";
 import { FluentText } from "../../../ui/primitives.slint";
 import { ButtonPage } from "button-page.slint";
@@ -14,11 +60,57 @@ import { RadioPage } from "radio-page.slint";
 import { RangePage, RangeBounds } from "range-page.slint";
 import { ProgressBarStatus } from "../../../ui/progress-bar.slint";
 import { RadioDirection, RadioItem, RadioNavigation } from "../../../ui/radio-group.slint";
+import { OverlaysPage } from "overlays-page.slint";
+import { OverlayPlacement } from "../../../ui/overlay-host.slint";
+import { ComboBoxPage } from "combo-box-page.slint";
+import { ContentDialogPage } from "content-dialog-page.slint";
+import { InfoBarPage, InfoBarSample } from "info-bar-page.slint";
+import { NavigationProbe, NavigationViewPage } from "navigation-view-page.slint";
+import { FrameEntry, FrameJournal, NavigationTransition } from "../../../ui/frame.slint";
+import { NavigationTree, NavigationItemDetails, NavigationItemKind, NavigationRow } from "../../../ui/navigation-tree.slint";
+export { NavigationTree, NavigationItemDetails, NavigationItemKind, NavigationRow }
+import { TopNavigationArrangement, TopNavigationLayout, TopNavigationMeasure, TopNavigationSlot } from "../../../ui/navigation-layout.slint";
+export { TopNavigationArrangement, TopNavigationLayout, TopNavigationMeasure, TopNavigationSlot }
+import { NavigationDisplayMode, NavigationPaneDisplayMode, NavigationView } from "../../../ui/navigation-view.slint";
+export { FrameEntry, FrameJournal, NavigationTransition, NavigationDisplayMode, NavigationPaneDisplayMode, NavigationProbe }
+import { InfoBarCloseReason } from "../../../ui/info-bar.slint";
+export { InfoBarCloseReason, InfoBarSample }
+import { ContentDialogButton, ContentDialogResult } from "../../../ui/content-dialog.slint";
+export { ContentDialogButton, ContentDialogResult }
+import { CompositionPage } from "composition-page.slint";
+import { ListSelectionMode } from "../../../ui/list-box.slint";
+import { ItemData } from "../../../ui/item-presenter.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+import { ListDirection, SelectionLogic } from "../../../ui/selection-model.slint";
+import { PageHost } from "../../../ui/page-host.slint";
+export { ItemData, ListDirection, ListSelectionMode, SelectionLogic, OverlayPlacement }
 export { AppearanceAction, ButtonState, FluentColorScheme, FluentMaterial, FluentTheme, TextBoxState, ToggleValue }
 export { RadioDirection, RadioItem, RadioNavigation }
-export { ProgressBarStatus, RangeBounds }
+export { OverlayArea, ProgressBarStatus, RangeBounds }
 
-export enum GalleryPage { button, text-box, foundations, toggles, radios, ranges }
+export enum GalleryPage { button, text-box, foundations, toggles, radios, ranges, composition, combo-box, overlays, content-dialog, info-bar, navigation-view, auto-suggest-box, tree-view, command-bar, password-box, toggle-switch, expander, split-button, repeat-button, hyperlink-button, drop-down-button, toggle-split-button, grid-view, number-box, person-picture, selector-bar, pips-pager }
+
+export struct GalleryDestination {
+    title: string,
+    label: string,
+    page: GalleryPage,
+}
+
+export global GalleryRoutes {
+    pure callback index([GalleryDestination], GalleryPage) -> int;
+}
+
+export struct GalleryNavigationProbe {
+    selected: int,
+    items: Point,
+    footer: Point,
+    item-step: length,
+    pane-width: length,
+    pane-open: bool,
+    mode: NavigationDisplayMode,
+    toggle: Point,
+    expanded-items: [int],
+}
 
 export component GalleryWindow inherits Window {
     title: "Fluent RS Gallery";
@@ -27,13 +119,64 @@ export component GalleryWindow inherits Window {
     default-font-family: root.font-family;
     default-font-size: FluentMetrics.scaled-font-size;
     background: root.native-desktop-acrylic && !FluentTheme.high-contrast
-        ? transparent : FluentMaterials.fallback-color(root.backdrop);
+        ? (root.tint-native-desktop-acrylic ? FluentTheme.desktop-acrylic-tint : transparent)
+        : FluentMaterials.fallback-color(root.backdrop);
 
     in property <bool> touch-targets;
+    out property <length> gallery-body-size: FluentMetrics.scaled-font-size;
+    out property <length> gallery-control-height: FluentMetrics.combo-min-height;
     in property <string> font-family;
     in-out property <GalleryPage> page;
+    out property <SelectorBarProbe> selector-bar-probe: selectors.probe;
+    public function focus-selector-clear() { selectors.focus-clear(); }
+    public function select-selector-item(index: int) { selectors.select-item(index); }
+    out property <PipsPagerProbe> pips-pager-probe: pips.probe;
+    in-out property <int> pips-index <=> pips.page-index;
+    in-out property <int> pips-count <=> pips.page-count;
+    in-out property <bool> pips-vertical <=> pips.vertical;
+    in-out property <bool> pips-wrap <=> pips.wrap-pages;
+    in-out property <bool> pips-enabled <=> pips.pager-enabled;
+    in-out property <PipsPagerButtonVisibility> pips-arrows <=> pips.arrow-mode;
+    in-out property <bool> email-enabled <=> drop-down-buttons.email-enabled;
+    in-out property <bool> list-format-checked <=> toggle-split-buttons.checked;
+    out property <DropDownProbe> drop-down-probe: drop-down-buttons.probe;
+    out property <ToggleSplitProbe> toggle-split-probe: toggle-split-buttons.probe;
+    in-out property <string> password <=> passwords.password;
+    in-out property <bool> password-enabled <=> passwords.input-enabled;
+    in-out property <PasswordRevealMode> password-reveal-mode <=> passwords.reveal-mode;
+    out property <PasswordProbe> password-probe: passwords.probe;
+    out property <int> password-edits: passwords.edits;
+    out property <int> password-submissions: passwords.submissions;
+    out property <bool> password-following-focused: passwords.following-focused;
+    public function select-password-input() { passwords.select-input(); }
+    public function focus-password-input() { passwords.focus-input(); }
+    public function leave-password-input() { passwords.leave-input(); }
+    in-out property <bool> switch-on <=> switches.is-on;
+    in-out property <bool> switch-enabled <=> switches.input-enabled;
+    in-out property <bool> switch-long-label <=> switches.long-label;
+    out property <SwitchProbe> switch-probe: switches.probe;
+    out property <int> switch-toggles: switches.toggles;
+    public function focus-switch() { switches.focus-toggle(); }
+    in-out property <[ItemData]> suggestion-items <=> suggestions.items;
+    in-out property <string> suggestion-text <=> suggestions.text;
+    in-out property <bool> suggestion-enabled <=> suggestions.input-enabled;
+    in-out property <bool> suggestion-query-icon <=> suggestions.query-icon;
+    in-out property <bool> suggestion-update-text <=> suggestions.update-text;
+    out property <SuggestProbe> suggestion-probe: suggestions.probe;
+    out property <AutoSuggestionTextChangeReason> suggestion-reason: suggestions.reason;
+    out property <int> suggestion-changes: suggestions.changes;
+    out property <int> suggestion-choices: suggestions.choices;
+    out property <int> suggestion-submissions: suggestions.submissions;
+    out property <string> suggestion-submitted-text: suggestions.submitted-text;
+    out property <int> suggestion-submitted-index: suggestions.submitted-index;
+    out property <bool> suggestion-following-focused: suggestions.following-focused;
+    callback filter-suggestions(string) -> [ItemData];
+    public function show-suggestions() { suggestions.show-suggestions(); }
+    public function dismiss-suggestions() { suggestions.dismiss-suggestions(); }
+    public function select-suggestion-input() { suggestions.select-input(); }
     in property <FluentMaterial> backdrop;
     in property <bool> native-desktop-acrylic;
+    in property <bool> tint-native-desktop-acrylic;
     in property <bool> alternate-accent;
     callback select-theme(FluentColorScheme);
     callback select-backdrop(FluentMaterial);
@@ -56,6 +199,12 @@ export component GalleryWindow inherits Window {
     out property <RangeBounds> vertical-slider-bounds: ranges.vertical-bounds;
     out property <RangeBounds> progress-bar-bounds: ranges.bar-bounds;
     out property <RangeBounds> progress-ring-bounds: ranges.ring-bounds;
+    out property <RangeBounds> range-viewport-bounds: {
+        position: ranges.absolute-position, width: ranges.width, height: ranges.height,
+    };
+    public function scroll-range-to-top() {
+        ranges.scroll-to({ x: 0px, y: 0px }, ScrollBehavior.instant);
+    }
     out property <Point> motion-button-center: foundations.motion-button-center;
     in-out property <bool> preview-acrylic <=> foundations.preview-acrylic;
     out property <Point> acrylic-sample: foundations.acrylic-sample;
@@ -76,6 +225,7 @@ export component GalleryWindow inherits Window {
     out property <length> example-x: buttons.example-x;
     out property <length> example-y: buttons.example-y;
     out property <length> example-height: buttons.example-height;
+    out property <length> example-width: buttons.example-width;
     out property <length> examples-right: buttons.examples-right;
 
     in-out property <bool> text-box-enabled <=> text-boxes.editing-enabled;
@@ -97,6 +247,9 @@ export component GalleryWindow inherits Window {
     out property <bool> read-only-selection: text-boxes.read-only-selection;
     out property <length> multi-line-x: text-boxes.multi-line-x;
     out property <length> multi-line-y: text-boxes.multi-line-y;
+    out property <length> multi-line-right: text-boxes.multi-line-right;
+    out property <length> multi-line-scroll-offset: text-boxes.multi-line-scroll-offset;
+    out property <Point> text-box-page-scroll-rail: text-boxes.page-scroll-rail;
     out property <string> multi-line-text: text-boxes.multi-line-text;
 
     in property <int> radio-max-columns: 3;
@@ -113,113 +266,563 @@ export component GalleryWindow inherits Window {
     out property <Point> standalone-radio-center: radios.standalone-center;
     out property <length> standalone-radio-height: radios.standalone-height;
 
+    in property <[ItemData]> composition-items;
+    in-out property <ListSelectionMode> composition-selection-mode <=> composition.selection-mode;
+    in-out property <bool> composition-list-enabled <=> composition.list-enabled;
+    in-out property <bool> composition-follows-focus <=> composition.follows-focus;
+    out property <int> composition-selection-edits: composition.selection-edits;
+    public function set-composition-selected-index(index: int) { composition.set-selected-index(index); }
+    in-out property <bool> composition-empty <=> composition.empty;
+    out property <[int]> composition-selected: composition.selected;
+    out property <int> composition-focused-row: composition.focused-row;
+    out property <length> composition-scroll-offset: composition.scroll-offset;
+    out property <length> composition-row-height: composition.row-height;
+    out property <Point> composition-list-origin: composition.list-origin;
+    out property <Point> composition-list-scroll-rail: composition.list-scroll-rail;
+    out property <Point> composition-popup-trigger: composition.popup-trigger;
+    out property <Point> composition-modal-trigger: composition.modal-trigger;
+    out property <bool> composition-popup-open: composition.popup-open;
+    out property <bool> composition-modal-open: composition.modal-open;
+    out property <bool> composition-popup-trigger-focused: composition.popup-trigger-focused;
+    out property <bool> composition-modal-trigger-focused: composition.modal-trigger-focused;
+    out property <OverlayArea> composition-popup-bounds: composition.popup-bounds;
+    out property <OverlayArea> composition-modal-bounds: composition.modal-bounds;
+
+    in-out property <bool> combo-enabled <=> combos.combo-enabled;
+    in-out property <bool> combo-empty <=> combos.empty;
+    in-out property <bool> combo-use-long-list <=> combos.use-long-list;
+    out property <int> combo-selected-index: combos.selected-index;
+    out property <string> combo-selected-text: combos.selected-text;
+    out property <int> combo-highlighted-index: combos.highlighted-index;
+    out property <bool> combo-open: combos.open;
+    out property <bool> combo-closing: combos.closing;
+    out property <int> combo-first-row: combos.first-row;
+    out property <bool> combo-candidate-focus-visible: combos.candidate-focus-visible;
+    out property <bool> combo-trigger-focused: combos.trigger-focused;
+    out property <bool> combo-keyboard-focus: combos.keyboard-focus;
+    out property <bool> combo-clear-focused: combos.clear-focused;
+    out property <ButtonState> combo-state: combos.combo-state;
+    out property <length> combo-glyph-offset: combos.glyph-offset;
+    in property <bool> combo-material-probe;
+    out property <OverlayArea> combo-trigger-bounds: combos.trigger-bounds;
+    out property <OverlayArea> combo-popup-bounds: combos.popup-bounds;
+    out property <int> combo-selection-edits: combos.selection-edits;
+    public function set-combo-selected-index(index: int) { combos.set-selected-index(index); }
+    out property <int> editable-combo-selected-index: combos.editable-selected-index;
+    out property <string> editable-combo-value: combos.editable-value;
+    out property <string> editable-combo-text: combos.editable-text;
+    out property <bool> editable-combo-focused: combos.editable-focused;
+    out property <bool> editable-combo-open: combos.editable-open;
+    out property <int> editable-combo-highlighted-index: combos.editable-highlighted-index;
+    out property <OverlayArea> editable-combo-popup-bounds: combos.editable-popup-bounds;
+    out property <OverlayArea> editable-combo-bounds: combos.editable-bounds;
+
+    in-out property <OverlayPlacement> flyout-placement <=> overlays.placement;
+    in property <bool> flyout-enabled: true;
+    out property <bool> flyout-open: overlays.flyout-open;
+    out property <bool> flyout-trigger-focused: overlays.flyout-trigger-focused;
+    out property <bool> flyout-trigger-focus-visible: overlays.flyout-trigger-focus-visible;
+    out property <bool> flyout-action-focused: overlays.flyout-action-focused;
+    out property <bool> flyout-action-focus-visible: overlays.flyout-action-focus-visible;
+    out property <OverlayArea> flyout-anchor: overlays.flyout-anchor;
+    out property <OverlayArea> flyout-bounds: overlays.flyout-bounds;
+    out property <int> flyout-confirmations: overlays.confirmations;
+    in property <bool> context-menu-enabled: true;
+    out property <bool> context-menu-open: overlays.menu-open;
+    out property <bool> context-menu-trigger-focused: overlays.menu-trigger-focused;
+    out property <OverlayArea> context-menu-bounds: overlays.menu-bounds;
+    out property <OverlayArea> context-menu-anchor: overlays.menu-anchor;
+    out property <int> context-menu-focus: overlays.menu-focus;
+    out property <bool> context-menu-focus-visible: overlays.menu-focus-visible;
+    out property <int> context-menu-last-command: overlays.last-command;
+    in property <duration> tooltip-delay: FluentMetrics.tooltip-show-delay;
+    in property <duration> tooltip-duration: FluentMetrics.tooltip-visible-duration;
+    out property <bool> tooltip-open: overlays.tip-open;
+    out property <bool> tooltip-pending: overlays.tip-pending;
+    out property <bool> tooltip-trigger-focused: overlays.tip-trigger-focused;
+    out property <OverlayArea> tooltip-anchor: overlays.tip-anchor;
+    out property <OverlayArea> tooltip-bounds: overlays.tip-bounds;
+    out property <int> tooltip-activations: overlays.tip-activations;
+    in property <bool> dialog-primary-enabled: true;
+    in property <bool> dialog-block-close;
+    out property <bool> dialog-open: dialogs.open;
+    out property <ContentDialogButton> dialog-focused-command: dialogs.focused-command;
+    out property <OverlayArea> dialog-bounds: dialogs.panel-bounds;
+    out property <ContentDialogResult> dialog-result: dialogs.last-result;
+    out property <int> dialog-openings: dialogs.openings;
+    out property <int> dialog-completions: dialogs.completions;
+    out property <int> dialog-editor-submissions: dialogs.editor-submissions;
+    out property <int> dialog-background-keys: dialogs.background-keys;
+    out property <bool> dialog-editor-focused: dialogs.editor-focused;
+    out property <bool> dialog-default-trigger-focused: dialogs.default-trigger-focused;
+    out property <bool> dialog-no-default-trigger-focused: dialogs.no-default-trigger-focused;
+    out property <bool> dialog-editor-trigger-focused: dialogs.editor-trigger-focused;
+    out property <bool> dialog-trigger-focus-visible: dialogs.default-trigger-focus-visible;
+    out property <Point> dialog-default-trigger: dialogs.default-trigger;
+    out property <Point> dialog-no-default-trigger: dialogs.no-default-trigger;
+    out property <Point> dialog-editor-trigger: dialogs.editor-trigger;
+    in-out property <bool> info-bar-long-message <=> info-bars.long-message;
+    in-out property <bool> info-bar-closable <=> info-bars.closable;
+    in property <bool> info-bar-prevent-dismissal;
+    out property <[InfoBarSample]> info-bar-samples: info-bars.samples;
+    out property <int> info-bar-close-clicks: info-bars.close-clicks;
+    out property <int> info-bar-close-attempts: info-bars.close-attempts;
+    out property <int> info-bar-closed-count: info-bars.closed-count;
+    out property <InfoBarCloseReason> info-bar-close-reason: info-bars.close-reason;
+    out property <bool> info-bar-close-focused: info-bars.info-close-focused;
+    public function set-information-open(open: bool) { info-bars.set-information-open(open); }
+    public function show-info-bars() { info-bars.show-all(); }
+
+    in-out property <NavigationPaneDisplayMode> navigation-pane-display-mode <=> navigation.pane-display-mode;
+    in-out property <bool> navigation-pane-visible <=> navigation.pane-visible;
+    in-out property <bool> navigation-custom-pane <=> navigation.custom-pane;
+    out property <NavigationProbe> navigation-probe: navigation.probe;
+    out property <int> navigation-history-length: navigation.history-length;
+    public function navigate-example(index: int) { navigation.navigate-example(index); }
+
+    in-out property <bool> tree-multiple <=> trees.multiple;
+    in-out property <bool> tree-large <=> trees.large;
+    out property <TreeViewProbe> tree-probe: trees.probe;
+    callback load-large-tree() -> [TreeNode];
+
+    in-out property <bool> command-narrow <=> commands.narrow;
+    in property <[CommandBarItem]> command-fixture;
+    in property <color> command-fixture-backdrop;
+    out property <CommandBarProbe> command-probe: commands.probe;
+    out property <ExpanderProbe> expander-probe: expanders.probe;
+    out property <SplitButtonProbe> split-button-probe: split-buttons.probe;
+    in property <[ItemData]> grid-fixture: root.composition-items;
+    in-out property <bool> grid-show-large <=> grids.show-large;
+    in-out property <bool> grid-scroll-horizontally <=> grids.scroll-horizontally;
+    in-out property <ListSelectionMode> grid-selection-mode <=> grids.selection-mode;
+    out property <GridViewProbe> grid-probe: grids.probe;
+    public function grid-scroll-to-index(index: int) { grids.scroll-to-index(index); }
+    public function grid-select-index(index: int) { grids.set-selected-index(index); }
+
+    in-out property <bool> repeat-enabled <=> repeat-buttons.button-enabled;
+    in-out property <bool> repeat-disable-on-click <=> repeat-buttons.disable-on-click;
+    in-out property <ButtonClickMode> repeat-click-mode <=> repeat-buttons.click-mode;
+    in-out property <duration> repeat-delay <=> repeat-buttons.delay;
+    in-out property <duration> repeat-interval <=> repeat-buttons.interval;
+    out property <int> repeat-clicks: repeat-buttons.clicks;
+    in-out property <string> number-value <=> numbers.value;
+    in-out property <string> number-text <=> numbers.text;
+    in-out property <string> number-minimum <=> numbers.minimum;
+    in-out property <string> number-maximum <=> numbers.maximum;
+    in-out property <string> number-small-change <=> numbers.small-change;
+    in-out property <string> number-large-change <=> numbers.large-change;
+    in-out property <bool> number-enabled <=> numbers.input-enabled;
+    in-out property <bool> number-wrap <=> numbers.wrap;
+    in-out property <bool> number-expression <=> numbers.accepts-expression;
+    in-out property <NumberBoxSpinButtonPlacement> number-placement <=> numbers.placement;
+    in-out property <NumberBoxValidationMode> number-validation <=> numbers.validation-mode;
+    in-out property <string> number-decimal-separator <=> numbers.decimal-separator;
+    in-out property <int> number-fraction-digits <=> numbers.minimum-fraction-digits;
+    out property <int> number-changes:numbers.changes;
+    out property <NumberProbe> number-probe:numbers.probe;
+    out property <bool> number-following-focused:numbers.following-focused;
+    public function focus-number-input() { numbers.focus-input(); }
+    public function select-number-input() { numbers.select-input(); }
+    public function leave-number-input() { numbers.leave-input(); }
+    public function commit-number-input() { numbers.commit-input(); }
+    in-out property <string> person-name <=> persons.display-name;
+    in-out property <string> person-initials <=> persons.initials;
+    in-out property <bool> person-photo <=> persons.photo;
+    in-out property <bool> person-group <=> persons.group;
+    in-out property <int> person-badge-number <=> persons.badge-number;
+    in-out property <string> person-badge-glyph <=> persons.badge-glyph;
+    in-out property <bool> person-badge-image <=> persons.badge-image;
+    in-out property <float> person-size <=> persons.picture-size;
+    out property <PersonProbe> person-probe:persons.probe;
+    out property <bool> person-following-focused:persons.following-focused;
+    public function focus-person-previous() { persons.focus-previous(); }
+    callback repeat-clicked;
+    out property <RepeatButtonProbe> repeat-probe: repeat-buttons.probe;
+    public function focus-repeat() { repeat-buttons.focus-button(); }
+    public function leave-repeat() { repeat-buttons.leave-button(); }
+    in-out property <bool> hyperlink-enabled <=> hyperlinks.link-enabled;
+    in-out property <bool> hyperlink-long-label <=> hyperlinks.long-label;
+    in-out property <bool> hyperlink-suppress-uri <=> hyperlinks.suppress-uri;
+    in-out property <string> hyperlink-uri <=> hyperlinks.navigate-uri;
+    out property <int> hyperlink-clicks: hyperlinks.clicks;
+    out property <int> hyperlink-requests: hyperlinks.navigation-requests;
+    out property <string> hyperlink-status: hyperlinks.status;
+    out property <HyperlinkProbe> hyperlink-probe: hyperlinks.probe;
+    public function focus-hyperlink() { hyperlinks.focus-link(); }
+    public function leave-hyperlink() { hyperlinks.leave-link(); }
+    public function focus-local-hyperlink() { hyperlinks.focus-local-link(); }
+
+    in property <bool> shell-pane-visible: true;
+    in property <[ItemData]> shell-items;
+    out property <GalleryNavigationProbe> shell-probe: {
+        selected: shell.selected-index, items: shell.items-origin, footer: shell.footer-origin, item-step: shell.item-step,
+        pane-width: shell.pane-width, pane-open: shell.pane-open, mode: shell.display-mode,
+        toggle: shell.toggle-center, expanded-items: shell.expanded-items,
+    };
+    out property <[GalleryDestination]> destinations: [
+        { title: "Button", page: GalleryPage.button },
+        { title: "TextBox", page: GalleryPage.text-box },
+        { title: "ToggleButton and CheckBox", label: "Toggles", page: GalleryPage.toggles },
+        { title: "RadioButton and RadioGroup", label: "Radio", page: GalleryPage.radios },
+        { title: "Slider and Progress", label: "Range", page: GalleryPage.ranges },
+        { title: "ListBox", page: GalleryPage.composition },
+        { title: "ComboBox", page: GalleryPage.combo-box },
+        { label: "Overlays" },
+        { title: "Overlays", label: "Flyout, Menu and Tooltip", page: GalleryPage.overlays },
+        { title: "ContentDialog", page: GalleryPage.content-dialog },
+        { title: "InfoBar", page: GalleryPage.info-bar },
+        { title: "NavigationView", page: GalleryPage.navigation-view },
+        { title: "TreeView", page: GalleryPage.tree-view },
+        { title: "CommandBar", page: GalleryPage.command-bar },
+        { title: "AutoSuggestBox", page: GalleryPage.auto-suggest-box },
+        { title: "PasswordBox", page: GalleryPage.password-box },
+        { title: "ToggleSwitch", page: GalleryPage.toggle-switch },
+        { title: "Expander", page: GalleryPage.expander },
+        { title: "SplitButton", page: GalleryPage.split-button },
+        { title: "RepeatButton", page: GalleryPage.repeat-button },
+        { title: "HyperlinkButton", page: GalleryPage.hyperlink-button },
+        { title: "DropDownButton", page: GalleryPage.drop-down-button },
+        { title: "ToggleSplitButton", page: GalleryPage.toggle-split-button },
+        { title: "GridView", page: GalleryPage.grid-view },
+        { title: "NumberBox", page: GalleryPage.number-box },
+        { title: "PersonPicture", page: GalleryPage.person-picture },
+        { title: "SelectorBar", page: GalleryPage.selector-bar },
+        { title: "PipsPager", page: GalleryPage.pips-pager },
+        { title: "Foundations", label: "Settings", page: GalleryPage.foundations },
+    ];
+    property <int> settings-destination: root.destinations.length - 1;
+    property <int> selected-destination: root.shell-items.length > 0
+        ? GalleryRoutes.index(root.destinations, root.page) : -1;
+    changed selected-destination => { shell.set-selected-index(root.selected-destination); }
+
+    property <OverlayArea> safe-viewport: {
+        x: root.safe-area-insets.left, y: root.safe-area-insets.top,
+        width: root.content-width,
+        height: max(0px, root.height - root.safe-area-insets.top - root.safe-area-insets.bottom),
+    };
+
     property <length> content-width: max(0px, root.width - root.safe-area-insets.left - root.safe-area-insets.right);
-    property <length> page-padding: content-width < FluentMetrics.compact-width ? FluentMetrics.spacing-large : FluentMetrics.spacing-page;
+    property <bool> compact-window: root.content-width < FluentMetrics.compact-width;
+    property <length> page-padding: root.compact-window ? FluentMetrics.spacing-large : FluentMetrics.spacing-page;
     property <length> target-size: touch-targets ? FluentMetrics.touch-target : 0px;
 
-    VerticalLayout {
-        x: root.safe-area-insets.left;
-        y: root.safe-area-insets.top;
-        width: root.content-width;
-        height: max(0px, parent.height - root.safe-area-insets.top - root.safe-area-insets.bottom);
-        padding: root.page-padding;
-        spacing: FluentMetrics.spacing-large;
-
-        VerticalLayout {
-            spacing: FluentMetrics.spacing-small;
-            Caption { text: "Fluent RS Gallery"; }
-            FluentText {
-                text: root.page == GalleryPage.button ? "Button"
-                    : root.page == GalleryPage.text-box ? "TextBox"
-                    : root.page == GalleryPage.toggles ? "ToggleButton and CheckBox"
-                    : root.page == GalleryPage.radios ? "RadioButton and RadioGroup"
-                    : root.page == GalleryPage.ranges ? "Slider and Progress" : "Foundations";
-                font-size: FluentMetrics.title-size;
-                font-weight: FluentMetrics.strong-weight;
-                wrap: word-wrap;
+    FocusScope {
+        width: 100%;
+        height: 100%;
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+        capture-key-pressed(event) => {
+            FluentFocus.keyboard-input = true;
+            if (event.text == Key.Escape && (overlays.tip-open || overlays.tip-pending)) {
+                overlays.dismiss-tip();
+                return accept;
             }
+            return reject;
         }
+        shell := NavigationView {
+            pane-title: "Fluent RS Gallery";
+            pane-display-mode: auto;
+            expanded-threshold: 900px;
+            open-pane-width: 240px * FluentTheme.ui-scale;
+            minimum-target: root.target-size;
+            pane-visible: root.shell-pane-visible;
+            viewport: root.safe-viewport;
+            content-background: root.shell-pane-visible && root.backdrop == FluentMaterial.solid-fallback
+                ? FluentTheme.navigation-content-fill : transparent;
+            initial-selected-index: 0;
+            items: root.shell-items;
+            footer-start: root.settings-destination;
+            item-details: [
+                { index: 7, parent-index: -1, selects-on-invoked: false },
+                { index: 8, parent-index: 7, selects-on-invoked: true },
+                { index: 9, parent-index: 7, selects-on-invoked: true },
+                { index: 11, parent-index: -1, selects-on-invoked: true,
+                  has-badge: true, badge-value: navigation.notification-count },
+                { index: root.settings-destination, parent-index: -1, selects-on-invoked: true, icon-kind: animated-settings },
+            ];
+            icons: [
+                @image-url("../../../ui/icons/fluent/cursor-click-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/window-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/toggle-left-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/radio-button-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/options-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/text-bullet-list-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/chevron-down-12-regular.svg"),
+                @image-url("../../../ui/icons/fluent/window-multiple-20-regular.svg"),
+                @image-url(""),
+                @image-url(""),
+                @image-url("../../../ui/icons/fluent/info-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/navigation-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/folder-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/more-horizontal-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/text-bullet-list-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/document-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/toggle-left-20-regular.svg"),
+                @image-url("../../../ui/icons/fluent/chevron-down-12-regular.svg"),
+                @image-url("../../../ui/icons/fluent/cursor-click-20-regular.svg"),
+                @image-url(""),
+                @image-url(""),
+                @image-url(""),
+                @image-url(""),
+                @image-url(""),
+            ];
+            selection-changed(index) => { root.page = root.destinations[index].page; }
+            x: root.safe-area-insets.left;
+            y: root.safe-area-insets.top;
+            width: root.content-width;
+            height: max(0px, parent.height - root.safe-area-insets.top - root.safe-area-insets.bottom);
+            VerticalLayout {
+                width: 100%;
+                height: 100%;
+                padding: root.page-padding;
+                spacing: root.compact-window ? FluentMetrics.spacing-medium : FluentMetrics.spacing-large;
 
-        FlexboxLayout {
-            spacing: FluentMetrics.spacing-medium;
-            alignment: start;
-            for option in [
-                { title: "Button", page: GalleryPage.button },
-                { title: "TextBox", page: GalleryPage.text-box },
-                { title: "Toggles", page: GalleryPage.toggles },
-                { title: "Radio", page: GalleryPage.radios },
-                { title: "Range", page: GalleryPage.ranges },
-                { title: "Foundations", page: GalleryPage.foundations },
-            ] : Button {
-                text: option.title;
-                minimum-target: root.target-size;
-                variant: root.page == option.page ? ButtonVariant.accent : ButtonVariant.standard;
-                accessible-description: root.page == option.page ? "Current page" : "Open examples";
-                clicked => { root.page = option.page; }
-            }
-        }
+                VerticalLayout {
+                    spacing: FluentMetrics.spacing-small;
+                    Caption { text: "Fluent RS Gallery"; }
+                    FluentText {
+                        text: root.selected-destination >= 0 ? root.destinations[root.selected-destination].title : "";
+                        font-size: FluentMetrics.title-size;
+                        font-weight: FluentMetrics.strong-weight;
+                        wrap: word-wrap;
+                    }
+                }
 
-        FlexboxLayout {
-            spacing: FluentMetrics.spacing-medium;
-            alignment: start;
-            for option in [
-                { title: "Light", scheme: FluentColorScheme.light },
-                { title: "Dark", scheme: FluentColorScheme.dark },
-                { title: "High contrast", scheme: FluentColorScheme.high-contrast },
-            ] : Button {
-                text: option.title;
-                minimum-target: root.target-size;
-                variant: FluentTheme.scheme == option.scheme ? ButtonVariant.accent : ButtonVariant.standard;
-                accessible-description: FluentTheme.scheme == option.scheme ? "Selected theme" : "Apply theme";
-                clicked => { root.select-theme(option.scheme); }
-            }
-        }
+                FlexboxLayout {
+                    spacing: root.compact-window ? FluentMetrics.spacing-small : FluentMetrics.spacing-medium;
+                    alignment: start;
+                    for option in [
+                        { title: "Light", scheme: FluentColorScheme.light },
+                        { title: "Dark", scheme: FluentColorScheme.dark },
+                        { title: "High contrast", scheme: FluentColorScheme.high-contrast },
+                    ] : Button {
+                        text: option.title;
+                        minimum-target: root.target-size;
+                        variant: FluentTheme.scheme == option.scheme ? ButtonVariant.accent : ButtonVariant.standard;
+                        accessible-description: FluentTheme.scheme == option.scheme ? "Selected theme" : "Apply theme";
+                        clicked => { root.select-theme(option.scheme); }
+                    }
+                }
 
-        Rectangle {
-            vertical-stretch: 1;
-            buttons := ButtonPage {
-                width: 100%;
-                height: 100%;
-                visible: root.page == GalleryPage.button;
-                target-size: root.target-size;
-            }
-            text-boxes := TextBoxPage {
-                width: 100%;
-                height: 100%;
-                visible: root.page == GalleryPage.text-box;
-                target-size: root.target-size;
-            }
-            toggles := TogglesPage {
-                width: 100%;
-                height: 100%;
-                visible: root.page == GalleryPage.toggles;
-                target-size: root.target-size;
-                check-label: root.check-box-label;
-            }
-            radios := RadioPage {
-                width: 100%;
-                height: 100%;
-                visible: root.page == GalleryPage.radios;
-                target-size: root.target-size;
-                max-columns: root.radio-max-columns;
-            }
-            ranges := RangePage {
-                width: 100%;
-                height: 100%;
-                visible: root.page == GalleryPage.ranges;
-                animations-enabled: self.visible && !root.minimized && root.range-animations-enabled;
-                target-size: root.target-size;
-            }
-            foundations := FoundationsPage {
-                width: 100%;
-                height: 100%;
-                visible: root.page == GalleryPage.foundations;
-                target-size: root.target-size;
-                alternate-accent: root.alternate-accent;
-                backdrop: root.backdrop;
-                native-desktop-acrylic: root.native-desktop-acrylic;
-                change-appearance(action) => { root.change-appearance(action); }
-                select-backdrop(material) => { root.select-backdrop(material); }
+                pages := PageHost {
+                    vertical-stretch: 1;
+                    buttons := ButtonPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.button;
+                        target-size: root.target-size;
+                    }
+                    text-boxes := TextBoxPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.text-box;
+                        target-size: root.target-size;
+                    }
+                    toggles := TogglesPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.toggles;
+                        target-size: root.target-size;
+                        check-label: root.check-box-label;
+                    }
+                    radios := RadioPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.radios;
+                        target-size: root.target-size;
+                        max-columns: root.radio-max-columns;
+                    }
+                    ranges := RangePage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.ranges;
+                        animations-enabled: self.visible && !root.minimized && root.range-animations-enabled;
+                        target-size: root.target-size;
+                    }
+                    composition := CompositionPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.composition;
+                        active: self.visible;
+                        compact: pages.compact;
+                        target-size: root.target-size;
+                        items: root.composition-items;
+                        viewport: root.safe-viewport;
+                    }
+                    combos := ComboBoxPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.combo-box;
+                        active: self.visible;
+                        target-size: root.target-size;
+                        viewport: root.safe-viewport;
+                        long-items: root.composition-items;
+                        material-probe: root.combo-material-probe;
+                    }
+                    overlays := OverlaysPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.overlays;
+                        active: self.visible;
+                        viewport: root.safe-viewport;
+                        target-size: root.target-size;
+                        flyout-enabled: root.flyout-enabled;
+                        menu-enabled: root.context-menu-enabled;
+                        window-visible: !root.minimized;
+                        tip-delay: root.tooltip-delay;
+                        tip-duration: root.tooltip-duration;
+                    }
+                    dialogs := ContentDialogPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.content-dialog;
+                        target-size: root.target-size;
+                        viewport: root.safe-viewport;
+                        primary-enabled: root.dialog-primary-enabled;
+                        block-close: root.dialog-block-close;
+                    }
+                    navigation := NavigationViewPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.navigation-view;
+                        active: self.visible;
+                        viewport: root.safe-viewport;
+                        target-size: root.target-size;
+
+                    }
+
+                    info-bars := InfoBarPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.info-bar;
+                        target-size: root.target-size;
+                        prevent-dismissal: root.info-bar-prevent-dismissal;
+                    }
+                    suggestions := AutoSuggestBoxPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.auto-suggest-box;
+                        active: self.visible;
+                        viewport: root.safe-viewport;
+                        target-size: root.target-size;
+                        filter(value) => { return root.filter-suggestions(value); }
+                    }
+                    trees := TreeViewPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.tree-view;
+                        target-size: root.target-size;
+                        load-large => { return root.load-large-tree(); }
+                    }
+                    commands := CommandBarPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.command-bar;
+                        active: self.visible;
+                        fixture-secondary: root.command-fixture;
+                        fixture-backdrop: root.command-fixture-backdrop;
+                        viewport: root.safe-viewport;
+                        target-size: root.target-size;
+                    }
+                    passwords := PasswordBoxPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.password-box;
+                        active: self.visible;
+                        target-size: root.target-size;
+                    }
+                    switches := ToggleSwitchPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.toggle-switch;
+                        active: self.visible;
+                        target-size: root.target-size;
+                    }
+                    expanders := ExpanderPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.expander;
+                        active: self.visible;
+                        target-size: root.target-size;
+                        viewport: root.safe-viewport;
+                    }
+                    split-buttons := SplitButtonPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.split-button;
+                        active: self.visible;
+                        target-size: root.target-size;
+                        viewport: root.safe-viewport;
+                    }
+                    repeat-buttons := RepeatButtonPage {
+                        width: 100%; height: 100%;
+                        visible: root.page == GalleryPage.repeat-button;
+                        active: self.visible;
+                        target-size: root.target-size;
+                        activated => { root.repeat-clicked(); }
+                    }
+                    hyperlinks := HyperlinkButtonPage {
+                        width: 100%; height: 100%;
+                        visible: root.page == GalleryPage.hyperlink-button;
+                        active: self.visible;
+                        target-size: root.target-size;
+                        go-to-toggles => { root.page = GalleryPage.toggles; }
+                    }
+                    drop-down-buttons := DropDownButtonPage {
+                        width: 100%; height: 100%;
+                        visible: root.page == GalleryPage.drop-down-button;
+                        active: self.visible;
+                        target-size: root.target-size;
+                        viewport: root.safe-viewport;
+                    }
+                    toggle-split-buttons := ToggleSplitButtonPage {
+                        width: 100%; height: 100%;
+                        visible: root.page == GalleryPage.toggle-split-button;
+                        active: self.visible;
+                        target-size: root.target-size;
+                        viewport: root.safe-viewport;
+                    }
+                    grids := GridViewPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.grid-view;
+                        active: self.visible;
+                        target-size: root.target-size;
+                        large-items: root.grid-fixture;
+                    }
+                    numbers := NumberBoxPage {
+                        width:100%;height:100%;visible:root.page == GalleryPage.number-box;
+                        active:self.visible;target-size:root.target-size;viewport:root.safe-viewport;
+                    }
+                    persons := PersonPicturePage {
+                        width:100%;height:100%;visible:root.page == GalleryPage.person-picture;
+                        target-size:root.target-size;
+                    }
+                    selectors := SelectorBarPage {
+                        width: 100%; height: 100%;
+                        visible: root.page == GalleryPage.selector-bar;
+                        active: self.visible;
+                        target-size: root.target-size;
+                    }
+                    pips := PipsPagerPage {
+                        width: 100%; height: 100%;
+                        visible: root.page == GalleryPage.pips-pager;
+                        active: self.visible;
+                        target-size: root.target-size;
+                        viewport: root.safe-viewport;
+                    }
+                    foundations := FoundationsPage {
+                        width: 100%;
+                        height: 100%;
+                        visible: root.page == GalleryPage.foundations;
+                        target-size: root.target-size;
+                        alternate-accent: root.alternate-accent;
+                        backdrop: root.backdrop;
+                        native-desktop-acrylic: root.native-desktop-acrylic;
+                        change-appearance(action) => { root.change-appearance(action); }
+                        select-backdrop(material) => { root.select-backdrop(material); }
+                    }
+                }
             }
         }
     }

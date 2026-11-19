@@ -1,0 +1,31 @@
+import { ItemData } from "item-presenter.slint";
+
+export struct TopNavigationSlot { index: int, x: length, width: length }
+export struct TopNavigationArrangement {
+    primary: [TopNavigationSlot],
+    overflow: [int],
+    footer: [TopNavigationSlot],
+    more-x: length,
+    overflow-width: length,
+    indicator-x: length,
+}
+
+export struct TopNavigationMeasure {
+    width: length,
+    more-width: length,
+    minimum-item-width: length,
+    selected: int,
+    footer-start: int,
+    recovery-margin: length,
+    trailing-width: length,
+}
+
+export global TopNavigationLayout {
+    pure callback indices(int, int) -> [int];
+    pure callback position([int], int) -> int;
+    pure callback slot([TopNavigationSlot], int) -> TopNavigationSlot;
+    pure callback visible-items([ItemData], [int]) -> [ItemData];
+    pure callback measure([length], int, length) -> [length];
+    pure callback arrange([int], [length], TopNavigationMeasure) -> TopNavigationArrangement;
+    pure callback step([ItemData], [TopNavigationSlot], [TopNavigationSlot], int, int) -> int;
+}

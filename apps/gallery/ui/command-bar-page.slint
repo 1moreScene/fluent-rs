@@ -1,0 +1,118 @@
+import { Button } from "../../../ui/button.slint";
+import { CommandBar, CommandBarClosedMode, CommandBarLabelPosition, CommandBarItem } from "../../../ui/command-bar.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+import { PageHost } from "../../../ui/page-host.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+export struct CommandBarProbe {
+    more: Point,
+    more-focused: bool,
+    open: bool,
+    height: length,
+    bar: OverlayArea,
+    row-height: length,
+    scroll-offset: length,
+    primary: [int],
+    overflow: [int],
+    panel: OverlayArea,
+    row: int,
+    last: int,
+    last-secondary: bool,
+}
+
+export component CommandBarPage inherits PageHost {
+    in property <bool> active;
+    in property <OverlayArea> viewport;
+    in property <length> target-size;
+    in-out property <bool> narrow;
+    in property <[CommandBarItem]> fixture-secondary;
+    in property <color> fixture-backdrop;
+    property <CommandBarLabelPosition> label-position: right;
+    property <CommandBarClosedMode> closed-mode;
+    property <bool> dynamic-overflow: true;
+    property <int> last: -1;
+    property <bool> last-secondary;
+    property <[CommandBarItem]> primary: [
+        { text: "Add", icon: @image-url("../../../ui/icons/fluent/add-20-regular.svg") },
+        { text: "Edit", icon: @image-url("../../../ui/icons/fluent/edit-20-regular.svg") },
+        { text: "Share", icon: @image-url("../../../ui/icons/fluent/share-20-regular.svg"), overflow-order: 1 },
+    ];
+    property <[CommandBarItem]> secondary: root.fixture-secondary.length > 0 ? root.fixture-secondary : [
+        { text: "Settings", icon: @image-url("../../../ui/icons/fluent/settings-20-regular.svg") },
+        { text: "Publish", disabled: true, icon: @image-url("../../../ui/icons/fluent/document-20-regular.svg") },
+        { text: "Preview", icon: @image-url("../../../ui/icons/fluent/window-20-regular.svg") },
+    ];
+
+    out property <CommandBarProbe> probe: {
+        more: bar.more-center, more-focused: bar.more-focused, open: bar.open, height: bar.height,
+        bar: bar.visible-bar-bounds, row-height: bar.overflow-row-height, scroll-offset: bar.overflow-scroll-offset,
+        primary: bar.primary-indices, overflow: bar.overflow-indices, panel: bar.overflow-bounds,
+        row: bar.focused-overflow-row, last: root.last, last-secondary: root.last-secondary,
+    };
+
+    if root.fixture-backdrop.alpha > 0 : Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.fixture-backdrop;
+    }
+
+    VerticalLayout {
+        padding: FluentMetrics.focus-outset;
+        spacing: FluentMetrics.spacing-large;
+        alignment: start;
+
+        FlexboxLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-medium;
+            Button {
+                text: root.narrow ? "Wide bar" : "Narrow bar";
+                minimum-target: root.target-size;
+                clicked => { root.narrow = !root.narrow; }
+            }
+            Button {
+                text: root.label-position == CommandBarLabelPosition.right ? "Labels: right"
+                    : root.label-position == CommandBarLabelPosition.bottom ? "Labels: bottom" : "Labels: collapsed";
+                minimum-target: root.target-size;
+                clicked => { root.label-position = root.label-position == CommandBarLabelPosition.right ? CommandBarLabelPosition.bottom
+                    : root.label-position == CommandBarLabelPosition.bottom ? CommandBarLabelPosition.collapsed : CommandBarLabelPosition.right; }
+            }
+            Button {
+                text: root.closed-mode == CommandBarClosedMode.compact ? "Compact" : "Minimal";
+                minimum-target: root.target-size;
+                clicked => { root.closed-mode = root.closed-mode == CommandBarClosedMode.compact ? CommandBarClosedMode.minimal : CommandBarClosedMode.compact; }
+            }
+            Button {
+                text: root.dynamic-overflow ? "Dynamic overflow on" : "Dynamic overflow off";
+                minimum-target: root.target-size;
+                clicked => { root.dynamic-overflow = !root.dynamic-overflow; }
+            }
+        }
+
+        Rectangle {
+            height: bar.layout-height;
+            bar := CommandBar {
+                x: 0px;
+                y: 0px;
+                width: root.narrow ? min(parent.width, 200px * FluentTheme.ui-scale) : parent.width;
+                active: root.active;
+                minimum-target: root.target-size;
+                viewport: root.viewport;
+                primary: root.primary;
+                secondary: root.secondary;
+                label-position: root.label-position;
+                closed-mode: root.closed-mode;
+                dynamic-overflow: root.dynamic-overflow;
+                invoked(index, secondary) => {
+                    root.last = index;
+                    root.last-secondary = secondary;
+                }
+            }
+        }
+
+        FluentText {
+            text: root.last < 0 ? "Choose a command" : "Invoked: " + (root.last-secondary ? root.secondary[root.last].text : root.primary[root.last].text);
+            color: FluentTheme.text-secondary;
+        }
+    }
+}

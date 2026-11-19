@@ -1,0 +1,86 @@
+import { NumberBox, NumberBoxSpinButtonPlacement, NumberBoxValidationMode } from "../../../ui/number-box.slint";
+import { Button } from "../../../ui/button.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { OverlayArea } from "../../../ui/overlay-placement.slint";
+import { TextBoxState } from "../../../ui/text-box.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+export struct NumberProbe {
+    input: OverlayArea, panel: OverlayArea, up: Point, down: Point,
+    focused: bool, selection: bool, open: bool, up-enabled: bool, down-enabled: bool,
+    repeating: bool, state: TextBoxState, error:string,
+}
+
+export component NumberBoxPage inherits FluentScrollView {
+    in property <bool> active;
+    in property <length> target-size;
+    in property <OverlayArea> viewport;
+    in-out property <string> value <=> number.value;
+    in-out property <string> text <=> number.text;
+    in-out property <string> minimum <=> number.minimum;
+    in-out property <string> maximum <=> number.maximum;
+    in-out property <string> small-change: "1";
+    in-out property <string> large-change: "10";
+    in-out property <bool> input-enabled: true;
+    in-out property <bool> wrap;
+    in-out property <bool> accepts-expression: true;
+    in-out property <NumberBoxSpinButtonPlacement> placement;
+    in-out property <NumberBoxValidationMode> validation-mode;
+    in-out property <string> decimal-separator: ".";
+    in-out property <int> minimum-fraction-digits;
+    out property <int> changes;
+    out property <string> previous-value;
+    out property <bool> following-focused: following.has-focus;
+    out property <NumberProbe> probe: {
+        input:number.input-bounds,panel:number.panel-bounds,up:number.up-center,down:number.down-center,
+        focused:number.editor-focused,selection:number.has-selection,open:number.open,
+        up-enabled:number.up-enabled,down-enabled:number.down-enabled,repeating:number.repeating,state:number.state,error:number.configuration-error,
+    };
+    public function focus-input() { number.focus(); }
+    public function select-input() { number.focus(); number.select-all(); }
+    public function leave-input() { following.focus(); }
+    public function commit-input() { number.commit(); }
+
+    mouse-drag-pan-enabled:false;
+    content-height:max(root.height,content.preferred-height);
+    content := VerticalLayout {
+        x:0px;y:0px;width:root.content-width;height:self.preferred-height;
+        padding:FluentMetrics.spacing-medium;spacing:FluentMetrics.spacing-large;
+        HorizontalLayout {
+            alignment:start;
+            number := NumberBox {
+                width:min(360px * FluentTheme.ui-scale,parent.width);
+                header:"Enter a number or expression";
+                placeholder-text:"1 + 2^2";
+                description:"Use ↑/↓ or Page Up/Page Down to change the value.";
+                active:root.active;enabled:root.input-enabled;
+                minimum-target:root.target-size;viewport:root.viewport;
+                small-change:root.small-change;large-change:root.large-change;
+                wrap:root.wrap;accepts-expression:root.accepts-expression;
+                spin-button-placement:root.placement;validation-mode:root.validation-mode;
+                decimal-separator:root.decimal-separator;minimum-fraction-digits:root.minimum-fraction-digits;
+                value-changed(old,new) => { root.changes += 1;root.previous-value = old; }
+            }
+        }
+        FluentText { text:"Value: " + (root.value == "" ? "Empty" : root.value);wrap:word-wrap; }
+        FluentText { text:"Changes: " + root.changes; }
+        following := Button { text:root.input-enabled ? "Disable input" : "Enable input";minimum-target:root.target-size;clicked => { root.input-enabled = !root.input-enabled; } }
+        FlexboxLayout {
+            spacing:FluentMetrics.spacing-medium;alignment:start;
+            for option in [{text:"Hidden",mode:NumberBoxSpinButtonPlacement.hidden},{text:"Inline",mode:NumberBoxSpinButtonPlacement.inline},{text:"Compact",mode:NumberBoxSpinButtonPlacement.compact}] : Button {
+                text:option.text;minimum-target:root.target-size;clicked => { root.placement = option.mode; }
+            }
+            Button { text:root.wrap ? "Disable wrap" : "Enable wrap";minimum-target:root.target-size;clicked => { root.wrap = !root.wrap; } }
+            Button { text:"Set range 0–100";minimum-target:root.target-size;clicked => { root.minimum = "0";root.maximum = "100"; } }
+        }
+        NumberBox {
+            header:"Decimal formatting";value:"12.5";minimum-fraction-digits:2;
+            placeholder-text:"0.00";active:root.active;viewport:root.viewport;minimum-target:root.target-size;
+        }
+        NumberBox {
+            header:"Disabled";value:"10";spin-button-placement:NumberBoxSpinButtonPlacement.inline;
+            enabled:false;active:root.active;viewport:root.viewport;minimum-target:root.target-size;
+        }
+    }
+}

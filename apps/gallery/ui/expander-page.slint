@@ -1,0 +1,158 @@
+import { ComboBox } from "../../../ui/combo-box.slint";
+import { Expander, ExpandDirection } from "../../../ui/expander.slint";
+import { ButtonState } from "../../../ui/interaction.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+import { PageHost } from "../../../ui/page-host.slint";
+import { FluentSurface, FluentText } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+export struct ExpanderProbe {
+    header: Point,
+    chevron: Point,
+    bounds: OverlayArea,
+    custom-bounds: OverlayArea,
+    custom-label: OverlayArea,
+    direction-button: Point,
+    direction-open: bool,
+    disabled-header: Point,
+    body: Point,
+    disabled-expanded: bool,
+    focused: bool,
+    state: ButtonState,
+    expanded: bool,
+    upward: bool,
+    revealed: length,
+}
+
+export component ExpanderPage inherits PageHost {
+    in property <bool> active;
+    in property <length> target-size;
+    in property <OverlayArea> viewport;
+    property <bool> upward: direction.selected-index == 1;
+    property <length> example-padding: 12px * FluentTheme.ui-scale;
+    property <length> options-padding: FluentMetrics.spacing-large;
+    property <length> sample-width: 500px * FluentTheme.ui-scale;
+    out property <ExpanderProbe> probe: {
+        header: details.header-center, chevron: details.chevron-center,
+        bounds: { x: details.absolute-position.x, y: details.absolute-position.y, width: details.width, height: details.height },
+        custom-bounds: { x: centered.absolute-position.x, y: centered.absolute-position.y, width: centered.width, height: centered.height },
+        custom-label: { x: title.absolute-position.x, y: title.absolute-position.y, width: title.width, height: title.height },
+        direction-button: { x: direction.absolute-position.x + direction.width / 2, y: direction.absolute-position.y + direction.height / 2 },
+        direction-open: direction.open,
+        disabled-header: disabled-details.header-center, disabled-expanded: disabled-details.expanded,
+        body: { x: body.absolute-position.x + body.width / 2, y: body.absolute-position.y + body.height / 2 },
+        focused: details.header-focused, state: details.header-state, expanded: details.expanded,
+        upward: root.upward, revealed: details.revealed-height,
+    };
+
+    FluentScrollView {
+        width: 100%;
+        height: 100%;
+        content-height: max(self.height, examples.preferred-height);
+        mouse-drag-pan-enabled: false;
+
+        examples := VerticalLayout {
+            alignment: start;
+            padding: FluentMetrics.focus-outset;
+            spacing: FluentMetrics.spacing-large;
+
+            first := FluentSurface {
+                property <bool> side-by-side: root.viewport.width >= 740px
+                    && self.width >= 480px * FluentTheme.ui-scale;
+                property <length> stage-height: max(details.preferred-height + 2 * root.example-padding, options.preferred-height);
+                property <length> stage-width: self.width - (self.side-by-side ? options.width : 0px);
+                height: self.side-by-side ? self.stage-height : self.stage-height + FluentMetrics.spacing-page + options.preferred-height;
+                background: FluentTheme.page;
+                border-radius: FluentMetrics.overlay-radius;
+
+                details := Expander {
+                    x: root.example-padding;
+                    y: root.upward ? first.stage-height - root.example-padding - self.height : root.example-padding;
+                    width: min(self.preferred-width, max(0px, first.stage-width - 2 * root.example-padding));
+                    height: self.preferred-height;
+                    header: "This text is in the header";
+                    active: root.active;
+                    expand-direction: root.upward ? ExpandDirection.up : ExpandDirection.down;
+                    body := FluentText {
+                        text: "This is in the content";
+                        wrap: word-wrap;
+                    }
+                }
+
+                Rectangle {
+                    x: first.side-by-side ? first.stage-width : 0px;
+                    y: first.side-by-side ? 0px : first.stage-height + FluentMetrics.spacing-page;
+                    width: options.width;
+                    height: first.side-by-side ? first.stage-height : options.preferred-height;
+                    background: FluentTheme.card-fill;
+                    border-top-right-radius: first.side-by-side ? FluentMetrics.overlay-radius : 0px;
+                    border-bottom-right-radius: FluentMetrics.overlay-radius;
+                    border-bottom-left-radius: first.side-by-side ? 0px : FluentMetrics.overlay-radius;
+                    Rectangle {
+                        width: first.side-by-side ? FluentMetrics.control-stroke : parent.width;
+                        height: first.side-by-side ? parent.height : FluentMetrics.control-stroke;
+                        background: FluentTheme.navigation-divider;
+                    }
+                }
+
+                options := VerticalLayout {
+                    x: first.side-by-side ? first.stage-width : 0px;
+                    y: first.side-by-side ? 0px : first.stage-height + FluentMetrics.spacing-page;
+                    width: first.side-by-side ? 160px * FluentTheme.ui-scale : first.width;
+                    height: self.preferred-height;
+                    padding: root.options-padding;
+                    spacing: FluentMetrics.spacing-medium;
+                    alignment: start;
+
+                    FluentText { text: "ExpandDirection"; }
+                    direction := ComboBox {
+                        width: min(120px * FluentTheme.ui-scale, max(0px, options.width - 2 * root.options-padding));
+                        label: "ExpandDirection";
+                        items: [{ text: "Down", disabled: false }, { text: "Up", disabled: false }];
+                        minimum-target: root.target-size;
+                        viewport: root.viewport;
+                        active: root.active;
+                        init => { self.set-selected-index(0); }
+                    }
+                }
+            }
+
+            second := FluentSurface {
+                height: centered.preferred-height + 2 * root.example-padding;
+                background: FluentTheme.page;
+                border-radius: FluentMetrics.overlay-radius;
+                centered := Expander {
+                    x: root.example-padding;
+                    y: root.example-padding;
+                    width: min(root.sample-width, max(0px, second.width - 2 * self.x));
+                    height: self.preferred-height;
+                    accessible-name: "This text is centered";
+                    content-padding: 0px;
+                    active: root.active;
+                    header-content << title := FluentText {
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        wrap: word-wrap;
+                        text: "This text is centered";
+                        accessible-role: none;
+                    }
+                    VerticalLayout {
+                        padding: FluentMetrics.spacing-small;
+                        FluentText {
+                            text: "And this text is left aligned";
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+            }
+
+            disabled-details := Expander {
+                width: min(self.preferred-width, max(0px, examples.width - 2 * examples.padding));
+                enabled: false;
+                header: "Unavailable details";
+                active: root.active;
+            }
+        }
+    }
+}

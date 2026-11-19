@@ -5,8 +5,39 @@ use slint::{
     platform::{Key, PointerEventButton, WindowEvent},
 };
 
-use super::{check, click};
+use super::{check, click, read_rgb};
 use crate::{FluentColorScheme, FluentTheme, GalleryPage, GalleryWindow, TextBoxState};
+
+pub(super) fn verify_page_scrollbar(gallery: &GalleryWindow) -> Result<(), Box<dyn Error>> {
+    gallery.set_page(GalleryPage::TextBox);
+    let theme = gallery.global::<FluentTheme>();
+    theme.set_scheme(FluentColorScheme::Light);
+    let window = gallery.window();
+    window.take_snapshot()?;
+    let rail = gallery.get_text_box_page_scroll_rail();
+    window.dispatch_event(WindowEvent::PointerMoved {
+        position: LogicalPosition::new(1., 1.),
+    });
+    let idle = read_rgb(window, rail)?;
+    window.dispatch_event(WindowEvent::PointerMoved { position: rail });
+    let expanded = read_rgb(window, rail)?;
+    let right = gallery.get_text_box_right();
+    if right + 6. > rail.x || expanded == idle {
+        return Err(format!(
+            "the page scrollbar should expand in its own gutter, got TextBox edge {right}, rail {rail:?} and pixels {idle:?} -> {expanded:?}"
+        ).into());
+    }
+    let track = LogicalPosition::new(rail.x - 6., rail.y);
+    let initial_track = read_rgb(window, track)?;
+    let reduced = theme.get_reduce_transparency();
+    theme.set_reduce_transparency(!reduced);
+    let alternative = read_rgb(window, track);
+    theme.set_reduce_transparency(reduced);
+    check(
+        alternative? != initial_track,
+        "the hovered rail switches between acrylic tint and its solid fallback",
+    )
+}
 
 pub(super) fn verify(gallery: &GalleryWindow) -> Result<(), Box<dyn Error>> {
     gallery.set_page(GalleryPage::TextBox);
@@ -28,7 +59,7 @@ pub(super) fn verify(gallery: &GalleryWindow) -> Result<(), Box<dyn Error>> {
         "TextBox hover",
     )?;
 
-    for _ in 0..10 {
+    for _ in 0..16 {
         key(window, Key::Tab);
         if gallery.get_text_box_state() == TextBoxState::Focused {
             break;
@@ -65,23 +96,35 @@ pub(super) fn verify(gallery: &GalleryWindow) -> Result<(), Box<dyn Error>> {
         shortcut(window, "z", true);
     }
     check(gallery.get_text_box_text() == "ac", "redo repeats deletion")?;
-    key(window, Key::End);
+    let (line_start, line_end) = if cfg!(target_os = "macos") {
+        (Key::LeftArrow, Key::RightArrow)
+    } else {
+        (Key::Home, Key::End)
+    };
+    let move_to_line_edge = |edge| {
+        if cfg!(target_os = "macos") {
+            shortcut(window, edge, false);
+        } else {
+            key(window, edge);
+        }
+    };
+    move_to_line_edge(line_end);
     key(window, "中");
-    key(window, Key::Home);
+    move_to_line_edge(line_start);
     key(window, Key::Delete);
     check(
         gallery.get_text_box_text() == "c中",
-        "Home, End, Delete and Unicode",
+        "line navigation, Delete and Unicode",
     )?;
     let long_text = "A long single-line value. ".repeat(20);
     gallery.set_text_box_text(long_text.clone().into());
-    key(window, Key::End);
+    move_to_line_edge(line_end);
     key(window, "!");
-    key(window, Key::Home);
+    move_to_line_edge(line_start);
     key(window, "^");
     check(
         gallery.get_text_box_text() == format!("^{long_text}!"),
-        "Home and End edit both sides of a clipped line",
+        "line navigation allows edits at both ends of a clipped line",
     )?;
     shortcut(window, "a", false);
     check(
@@ -152,6 +195,21 @@ pub(super) fn verify(gallery: &GalleryWindow) -> Result<(), Box<dyn Error>> {
         !gallery.get_other_clear_visible(),
         "multiline TextBox hides the clear button",
     )?;
+    for _ in 0..12 {
+        key(window, Key::Return);
+        key(window, "x");
+    }
+    let offset = gallery.get_multi_line_scroll_offset();
+    check(offset > 0., "the multiline editor scrolls to its caret")?;
+    window.dispatch_event(WindowEvent::PointerScrolled {
+        position: LogicalPosition::new(gallery.get_multi_line_right() - 6., multi_line.y),
+        delta_x: 0.,
+        delta_y: 50.,
+    });
+    check(
+        gallery.get_multi_line_scroll_offset() < offset,
+        "the multiline scrollbar scrolls the editor viewport",
+    )?;
 
     gallery.set_page(GalleryPage::Button);
     gallery.set_page(GalleryPage::TextBox);
@@ -183,7 +241,11 @@ fn verify_inline_clear(
         "selection before clearing",
     )?;
 
-    let clear = LogicalPosition::new(gallery.get_text_box_right() - 16., editable.y);
+    let right = gallery.get_text_box_right();
+    let half_height = gallery.get_text_box_bottom() - editable.y;
+    let clear = LogicalPosition::new(right - half_height - 2., editable.y);
+    window.dispatch_event(WindowEvent::PointerMoved { position: editable });
+    verify_clear_glyph_center(window, clear)?;
     let outside = LogicalPosition::new(clear.x - 40., clear.y);
     let button = PointerEventButton::Left;
     let edits_before = gallery.get_text_box_edits();
@@ -205,8 +267,11 @@ fn verify_inline_clear(
         "canceling clear keeps the TextBox focused",
     )?;
 
-    click(window, clear);
-    check(gallery.get_text_box_text() == "", "click clears text")?;
+    click(window, LogicalPosition::new(right - 2., clear.y));
+    check(
+        gallery.get_text_box_text() == "",
+        "the trailing margin remains part of the clear button hit target",
+    )?;
     check(
         gallery.get_text_box_edits() == edits_before + 1,
         "clear reports one edit",
@@ -232,6 +297,37 @@ fn verify_inline_clear(
     check(
         gallery.get_text_box_text() == "Z" && gallery.get_text_box_clear_visible(),
         "typing can resume immediately after clearing",
+    )
+}
+
+fn verify_clear_glyph_center(
+    window: &Window,
+    expected: LogicalPosition,
+) -> Result<(), Box<dyn Error>> {
+    let scale = window.scale_factor();
+    let frame = window.take_snapshot()?;
+    let start = LogicalPosition::new(expected.x - 7., expected.y - 7.).to_physical(scale);
+    let end = LogicalPosition::new(expected.x + 7., expected.y + 7.).to_physical(scale);
+    let (mut left, mut top, mut right, mut bottom) = (end.x, end.y, start.x, start.y);
+    for y in start.y..end.y {
+        for x in start.x..end.x {
+            let pixel = frame.as_slice()[y as usize * frame.width() as usize + x as usize];
+            if pixel.r < 144 && pixel.g < 144 && pixel.b < 144 {
+                left = left.min(x);
+                top = top.min(y);
+                right = right.max(x);
+                bottom = bottom.max(y);
+            }
+        }
+    }
+    let center_x = (left + right + 1) as f32 / (2. * scale);
+    let center_y = (top + bottom + 1) as f32 / (2. * scale);
+    check(
+        left <= right
+            && top <= bottom
+            && (center_x - expected.x).abs() <= 0.8
+            && (center_y - expected.y).abs() <= 0.8,
+        "clear glyph is centered in the inset visual surface",
     )
 }
 
@@ -262,14 +358,10 @@ fn key(window: &Window, text: impl Into<SharedString>) {
     window.dispatch_event(WindowEvent::KeyReleased { text });
 }
 
-fn shortcut(window: &Window, text: &str, shift: bool) {
-    let modifier = if cfg!(target_os = "macos") {
-        Key::Meta
-    } else {
-        Key::Control
-    };
+fn shortcut(window: &Window, text: impl Into<SharedString>, shift: bool) {
+    // Slint's platform event uses Control for the macOS Command key.
     window.dispatch_event(WindowEvent::KeyPressed {
-        text: modifier.into(),
+        text: Key::Control.into(),
     });
     if shift {
         window.dispatch_event(WindowEvent::KeyPressed {
@@ -283,6 +375,6 @@ fn shortcut(window: &Window, text: &str, shift: bool) {
         });
     }
     window.dispatch_event(WindowEvent::KeyReleased {
-        text: modifier.into(),
+        text: Key::Control.into(),
     });
 }

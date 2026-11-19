@@ -1,3 +1,4 @@
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
 import { Button, ButtonState, ButtonVariant } from "../../../ui/button.slint";
 import { ButtonSurface } from "../../../ui/button-surface.slint";
 import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
@@ -8,7 +9,7 @@ component StateSample inherits ButtonSurface {
     horizontal-stretch: 1;
 }
 
-export component ButtonPage inherits Flickable {
+export component ButtonPage inherits FluentScrollView {
     in property <length> target-size;
     in-out property <bool> examples-enabled: true;
     out property <int> activation-count;
@@ -17,14 +18,16 @@ export component ButtonPage inherits Flickable {
     out property <length> example-x: standard.absolute-position.x + standard.width / 2;
     out property <length> example-y: standard.absolute-position.y + standard.height / 2;
     out property <length> example-height: standard.height;
+    out property <length> example-width: standard.width;
     out property <length> examples-right: subtle.absolute-position.x + subtle.width;
 
     property <length> state-label-width: 86px;
-    content-width: self.width;
     content-height: max(self.height, page.preferred-height);
 
     page := VerticalLayout {
-        width: parent.width;
+        x: 0px;
+        y: 0px;
+        width: root.content-width;
         height: self.preferred-height;
         padding: FluentMetrics.spacing-small;
         spacing: FluentMetrics.spacing-large;

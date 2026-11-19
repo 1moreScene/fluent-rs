@@ -1,0 +1,74 @@
+import { PersonPicture, PersonPictureState } from "../../../ui/person-picture.slint";
+import { Button } from "../../../ui/button.slint";
+import { TextBox } from "../../../ui/text-box.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { OverlayArea } from "../../../ui/overlay-placement.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+export struct PersonProbe {
+    bounds:OverlayArea,badge:OverlayArea,initials:string,state:PersonPictureState,
+    initials-size:length,badge-visible:bool,badge-label:string,accessible-name:string,
+}
+export component PersonPicturePage inherits FluentScrollView {
+    in property <length> target-size;
+    in-out property <string> display-name:"Jane Doe";
+    in-out property <string> initials;
+    in-out property <bool> photo:true;
+    in-out property <bool> group;
+    in-out property <int> badge-number;
+    in-out property <string> badge-glyph;
+    in-out property <bool> badge-image;
+    in-out property <float> picture-size:96;
+    out property <bool> following-focused:following.has-focus;
+    out property <PersonProbe> probe: {
+        bounds:{x:portrait.absolute-position.x,y:portrait.absolute-position.y,width:portrait.width,height:portrait.height},
+        badge:{x:portrait.absolute-position.x + portrait.width - portrait.badge-size + FluentMetrics.person-badge-outset,
+            y:portrait.absolute-position.y - FluentMetrics.person-badge-outset,width:portrait.badge-size,height:portrait.badge-size},
+        initials:portrait.actual-initials,state:portrait.state,initials-size:portrait.initials-size,
+        badge-visible:portrait.badge-visible,badge-label:portrait.badge-label,accessible-name:portrait.accessible-name,
+    };
+    public function focus-previous() { previous.focus(); }
+    mouse-drag-pan-enabled:false;
+    content-height:max(root.height,content.preferred-height);
+    content := VerticalLayout {
+        x:0px;y:0px;width:root.content-width;height:self.preferred-height;
+        padding:FluentMetrics.spacing-medium;spacing:FluentMetrics.spacing-large;
+        FlexboxLayout {
+            alignment:start;spacing:FluentMetrics.spacing-large;
+            previous := Button { text:"Previous profile";minimum-target:root.target-size;clicked => { root.display-name = "Jane Doe"; } }
+            portrait := PersonPicture {
+                size:root.picture-size * FluentTheme.ui-scale * 1px;
+                min-width:self.size;max-width:self.size;min-height:self.size;max-height:self.size;
+                display-name:root.display-name;initials:root.initials;is-group:root.group;
+                profile-picture:root.photo ? @image-url("assets/avatar-sample.svg") : @image-url("");
+                badge-number:root.badge-number;badge-glyph:root.badge-glyph;
+                badge-image-source:root.badge-image ? @image-url("assets/avatar-sample.svg") : @image-url("");
+            }
+            following := Button { text:"Next profile";minimum-target:root.target-size;clicked => { root.display-name = "Ada Lovelace"; } }
+        }
+        FlexboxLayout {
+            alignment:start;spacing:FluentMetrics.spacing-medium;
+            Button { text:"Profile image";minimum-target:root.target-size;clicked => { root.photo = true;root.group = false; } }
+            Button { text:"Display name";minimum-target:root.target-size;clicked => { root.photo = false;root.group = false;root.initials = "";root.display-name = "Jane Doe"; } }
+            Button { text:"Initials";minimum-target:root.target-size;clicked => { root.photo = false;root.group = false;root.initials = "SB"; } }
+            Button { text:root.group ? "Show person" : "Show group";minimum-target:root.target-size;clicked => { root.group = !root.group; } }
+        }
+        TextBox { label:"Display name";text <=> root.display-name;minimum-target:root.target-size; }
+        TextBox { label:"Explicit initials";text <=> root.initials;minimum-target:root.target-size; }
+        FlexboxLayout {
+            alignment:start;spacing:FluentMetrics.spacing-medium;
+            Button { text:"Number badge";minimum-target:root.target-size;clicked => { root.badge-image = false;root.badge-number = root.badge-number == 3 ? 120 : 3; } }
+            Button { text:"Glyph badge";minimum-target:root.target-size;clicked => { root.badge-image = false;root.badge-number = 0;root.badge-glyph = "!"; } }
+            Button { text:"Image badge";minimum-target:root.target-size;clicked => { root.badge-image = true; } }
+            Button { text:"Clear badge";minimum-target:root.target-size;clicked => { root.badge-image = false;root.badge-number = 0;root.badge-glyph = ""; } }
+        }
+        FlexboxLayout {
+            alignment:start;spacing:FluentMetrics.spacing-large;
+            PersonPicture { size:32px * FluentTheme.ui-scale;display-name:"Jane Doe"; }
+            PersonPicture { size:64px * FluentTheme.ui-scale;initials:"SB";badge-number:3; }
+            PersonPicture { size:96px * FluentTheme.ui-scale;is-group:true; }
+        }
+        FluentText { text:"The profile image is a project-owned illustration.";wrap:word-wrap; }
+    }
+}

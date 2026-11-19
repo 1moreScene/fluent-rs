@@ -1,0 +1,92 @@
+import { Button, ButtonState } from "../../../ui/button.slint";
+import { OverlayArea } from "../../../ui/overlay-placement.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { ToggleSwitch, ToggleSwitchSurface } from "../../../ui/toggle-switch.slint";
+import { FluentMetrics } from "../../../ui/tokens.slint";
+import { Caption } from "caption.slint";
+
+export struct SwitchProbe {
+    bounds: OverlayArea, track: Point, knob: Point, focused: bool,
+    focus-visible: bool, state: ButtonState, dragging: bool,
+}
+
+export component ToggleSwitchPage inherits FluentScrollView {
+    in property <bool> active;
+    in property <length> target-size;
+    in-out property <bool> is-on <=> toggle.is-on;
+    in-out property <bool> input-enabled: true;
+    in-out property <bool> long-label;
+    out property <int> toggles;
+    out property <SwitchProbe> probe: {
+        bounds: { x: toggle.hit-position.x, y: toggle.hit-position.y, width: toggle.hit-width, height: toggle.hit-height },
+        track: toggle.track-position, knob: toggle.knob-center, focused: toggle.has-focus,
+        focus-visible: toggle.focus-visible, state: toggle.state, dragging: toggle.dragging,
+    };
+    public function focus-toggle() { toggle.focus(); }
+
+    mouse-drag-pan-enabled: false;
+    content-height: max(root.height, content.preferred-height);
+    content := VerticalLayout {
+        x: 0px;
+        y: 0px;
+        width: root.content-width;
+        height: self.preferred-height;
+        padding: FluentMetrics.spacing-medium;
+        spacing: FluentMetrics.spacing-large;
+
+        toggle := ToggleSwitch {
+            header: "Wi-Fi";
+            on-content: root.long-label ? "Automatically connect when this network becomes available" : "On";
+            off-content: root.long-label ? "Automatic connection is currently turned off" : "Off";
+            enabled: root.input-enabled;
+            active: root.active;
+            minimum-target: root.target-size;
+            toggled(value) => { root.toggles += 1; }
+        }
+        ToggleSwitch {
+            header: "Background sync";
+            is-on: true;
+            on-content: "Sync enabled";
+            off-content: "Sync disabled";
+            active: root.active;
+            minimum-target: root.target-size;
+        }
+        FlexboxLayout {
+            spacing: FluentMetrics.spacing-medium;
+            alignment: start;
+            Button {
+                text: root.input-enabled ? "Disable input" : "Enable input";
+                minimum-target: root.target-size;
+                clicked => { root.input-enabled = !root.input-enabled; }
+            }
+            Button {
+                text: root.long-label ? "Short labels" : "Long labels";
+                minimum-target: root.target-size;
+                clicked => { root.long-label = !root.long-label; }
+            }
+        }
+        FluentText { text: "Toggles: " + root.toggles; }
+        for on in [false, true] : VerticalLayout {
+            spacing: FluentMetrics.spacing-medium;
+            Caption { text: on ? "On states" : "Off states"; }
+            for sample in [
+                { label: "Normal", state: ButtonState.normal, focused: false },
+                { label: "Pointer over", state: ButtonState.pointer-over, focused: false },
+                { label: "Pressed", state: ButtonState.pressed, focused: false },
+                { label: "Keyboard focus", state: ButtonState.normal, focused: true },
+                { label: "Disabled", state: ButtonState.disabled, focused: false },
+            ] : ToggleSwitchSurface {
+                width: min(parent.width, self.natural-width);
+                height: self.min-height;
+                horizontal-stretch: 0;
+                is-on: on;
+                state: sample.state;
+                focus-visible: sample.focused;
+                on-content: sample.label;
+                off-content: sample.label;
+                minimum-target: root.target-size;
+            }
+        }
+    }
+}

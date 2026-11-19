@@ -1,0 +1,363 @@
+import { ComboPopupGeometry, ComboPopupLayout } from "combo-popup-layout.slint";
+import { ComboBoxSurface } from "combo-box-surface.slint";
+import { ComboTextSearch } from "combo-text-search.slint";
+import { ButtonState, FluentPressable } from "interaction.slint";
+import { ItemAppearance, ItemData } from "item-presenter.slint";
+import { OverlayArea, OverlayHost } from "overlay-host.slint";
+import { SelectableList } from "selectable-list.slint";
+import { ListDirection, SelectionLogic, SelectionModel } from "selection-model.slint";
+import { TextBox } from "text-box.slint";
+import { FluentMetrics } from "tokens.slint";
+
+// Both modes preview a row before committing it to the shared selection model.
+export component ComboBox inherits FocusScope {
+    in property <[ItemData]> items;
+    in property <string> label;
+    in property <string> placeholder: "Choose an option";
+    in property <length> minimum-target;
+    in property <OverlayArea> viewport;
+    in property <bool> active: true;
+    in property <bool> editable;
+    out property <int> selected-index: selection.selected-index;
+    out property <string> selected-text: root.selected-index >= 0 && root.selected-index < root.items.length
+        ? root.items[root.selected-index].text : root.editable ? root.custom-text : "";
+    out property <string> edit-text: editor.text;
+    out property <bool> open: popup.open;
+    out property <bool> trigger-focused: root.editable ? editor.has-focus : trigger.has-focus;
+    out property <bool> focus-visible: trigger.focus-visible && !root.open;
+    out property <bool> closing: popup.closing;
+    out property <int> popup-first-row: root.geometry.first-row;
+    out property <bool> highlighted-focus-visible: !root.editable && root.open && root.popup-keyboard-focus;
+    out property <ButtonState> state: trigger.state;
+    out property <length> glyph-offset: appearance.glyph-offset;
+    out property <OverlayArea> popup-bounds: popup.panel-bounds;
+    out property <int> highlighted-index: root.open ? root.popup-focus : -1;
+    callback selection-changed(int);
+    // Return false to keep the previously committed value.
+    callback text-submitted(string) -> bool;
+    text-submitted(text) => { return true; }
+
+    property <string> custom-text;
+    property <int> edit-match: -1;
+    property <bool> skip-completion;
+    property <int> popup-focus: -1;
+    property <bool> popup-keyboard-focus;
+    property <int> opening-index: -1;
+    property <length> panel-inset: FluentMetrics.control-stroke + FluentMetrics.combo-popup-content-margin;
+    property <OverlayArea> anchor-bounds: {
+        x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height,
+    };
+    property <bool> opens-above: root.geometry.bounds.y < root.anchor-bounds.y;
+    property <length> popup-width: root.editable ? root.width
+        : max(root.width, root.minimum-target > 0px ? FluentMetrics.combo-popup-touch-width : FluentMetrics.combo-popup-min-width);
+    property <ComboPopupGeometry> geometry: root.editable ? ComboPopupLayout.arrange-editable(root.viewport,
+        root.anchor-bounds, root.popup-width, root.row-height, root.panel-inset, root.item-count)
+        : ComboPopupLayout.arrange(root.viewport, root.anchor-bounds, root.popup-width, root.row-height,
+            root.panel-inset, root.item-count, root.open ? root.opening-index : root.selected-index);
+    property <int> item-count: root.items.length;
+    property <length> row-height: FluentMetrics.list-row-height(root.minimum-target);
+
+    min-width: max(FluentMetrics.combo-min-width, root.minimum-target);
+    min-height: max(root.minimum-target, appearance.min-height, root.editable ? editor.min-height : 0px);
+    preferred-height: self.min-height;
+    vertical-stretch: 0;
+    forward-focus: trigger;
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+
+    selection := SelectionModel {
+        items: root.items;
+        changed-by-user => { root.selection-changed(self.selected-index); }
+    }
+
+    public function set-selected-index(index: int) {
+        popup.dismiss();
+        if (index == -1 || selection.enabled(index)) {
+            root.custom-text = "";
+            selection.set-index(index);
+            if (root.editable) { root.restore-text(); }
+        }
+    }
+
+    changed items => { root.reset-edit(); }
+    changed item-count => { root.reset-edit(); }
+
+    function reset-edit() {
+        popup.dismiss();
+        root.custom-text = "";
+        if (root.editable) {
+            selection.clear();
+            root.restore-text();
+        }
+    }
+
+    function restore-text() {
+        root.edit-match = root.selected-index;
+        editor.text = root.selected-text;
+    }
+
+    function choose(index: int) {
+        if (root.editable && selection.enabled(index)) {
+            root.custom-text = "";
+            editor.text = root.items[index].text;
+            root.edit-match = index;
+        }
+        selection.activate(index, false);
+    }
+
+    function submit-text() {
+        if (editor.preedit-text != "") { return; }
+        let value = editor.text;
+        if (selection.enabled(root.edit-match) && value == root.items[root.edit-match].text) {
+            root.choose(root.edit-match);
+            return;
+        }
+        if (value == root.selected-text) { return; }
+        let match = ComboTextSearch.find(root.items, value, 0, false);
+        if (match.index >= 0) {
+            root.choose(match.index);
+        } else if (ComboTextSearch.contains-text(value) && root.text-submitted(value)) {
+            let submitted = ComboTextSearch.find(root.items, value, 0, false);
+            if (submitted.index >= 0) {
+                root.choose(submitted.index);
+            } else {
+                let had-selection = root.selected-index >= 0;
+                root.custom-text = value;
+                selection.set-index(-1);
+                root.edit-match = -1;
+                if (had-selection) { root.selection-changed(-1); }
+            }
+        } else {
+            root.restore-text();
+        }
+    }
+
+    function preview(index: int) {
+        root.edit-match = index;
+        root.popup-focus = index;
+    }
+
+    function edit-key(event: KeyEvent) -> EventResult {
+        if (editor.preedit-text != "") { return reject; }
+        root.skip-completion = event.text == Key.Backspace || event.text == Key.Delete
+            || ((event.modifiers.control || event.modifiers.meta) && (event.text == "z" || event.text == "Z"));
+        if (event.text == Key.Escape) {
+            if (!root.open && editor.text == root.selected-text) { return reject; }
+            root.restore-text();
+            popup.dismiss-with-transition();
+            return accept;
+        }
+        if (event.text == Key.Tab || event.text == Key.Backtab) {
+            root.submit-text();
+            popup.dismiss();
+            return reject;
+        }
+        if (root.dropdown-shortcut(event)) {
+            if (!event.repeat) {
+                if (root.open) { root.submit-text(); popup.dismiss-with-transition(); }
+                else { root.open-popup(); }
+            }
+            return accept;
+        }
+        if (event.text == Key.UpArrow || event.text == Key.DownArrow) {
+            if (!root.open) {
+                root.open-popup();
+            } else {
+                let index = SelectionLogic.target(root.items, root.popup-focus,
+                    event.text == Key.UpArrow ? ListDirection.previous : ListDirection.next);
+                if (index >= 0) {
+                    editor.text = root.items[index].text;
+                    root.preview(index);
+                    editor.select-all();
+                }
+            }
+            return accept;
+        }
+        return reject;
+    }
+
+    function open-popup() {
+        if (root.enabled && root.active && root.item-count > 0 && !root.open) {
+            if (root.editable) {
+                editor.focus();
+                root.popup-focus = root.edit-match >= 0 ? root.edit-match : root.selected-index;
+            } else if (!trigger.has-focus) { trigger.focus(); }
+            root.opening-index = root.selected-index;
+            popup.show();
+            if (root.editable) { editor.focus(); }
+        }
+    }
+
+    function step-selection(direction: ListDirection) {
+        let target = SelectionLogic.target(root.items, root.selected-index, direction);
+        if (target >= 0) { selection.activate(target, false); }
+    }
+
+    pure function dropdown-shortcut(event: KeyEvent) -> bool {
+        return (event.text == Key.F4 && !event.modifiers.alt && !event.modifiers.control
+            && !event.modifiers.shift && !event.modifiers.meta)
+            || (event.modifiers.alt && (event.text == Key.UpArrow || event.text == Key.DownArrow));
+    }
+
+    key-pressed(event) => {
+        if (!root.enabled || !root.active || root.editable) { return reject; }
+        let arrow = event.text == Key.UpArrow || event.text == Key.DownArrow;
+        if (root.dropdown-shortcut(event)) {
+            if (!event.repeat) {
+                trigger.use-keyboard-focus();
+                root.open-popup();
+            }
+            return accept;
+        }
+        if (arrow || event.text == Key.Home || event.text == Key.End) {
+            root.step-selection(event.text == Key.Home ? ListDirection.first
+                : event.text == Key.End ? ListDirection.last
+                : event.text == Key.UpArrow ? ListDirection.previous : ListDirection.next);
+            return accept;
+        }
+        return reject;
+    }
+
+    capture-key-pressed(event) => {
+        if (!root.editable || !root.enabled || !root.active || !editor.has-focus) { return reject; }
+        if (root.closing) { return accept; }
+        return root.edit-key(event);
+    }
+
+    editor := TextBox {
+        width: 100%;
+        height: 100%;
+        visible: root.editable;
+        enabled: root.editable && root.active && root.enabled;
+        accessible-name: root.label;
+        placeholder-text: root.placeholder;
+        minimum-target: root.minimum-target;
+        show-clear-button: false;
+        square-top: root.open && root.opens-above;
+        square-bottom: root.open && !root.opens-above;
+        trailing-inset: FluentMetrics.combo-chevron-column;
+        changed has-focus => {
+            if (root.editable && !self.has-focus && root.enabled && !root.open) { root.submit-text(); }
+        }
+        edited(value) => {
+            let match = ComboTextSearch.find(root.items, value, self.cursor-byte-offset,
+                !root.skip-completion && self.preedit-text == "");
+            root.skip-completion = false;
+            root.preview(match.index);
+            if (match.index >= 0) {
+                let option = root.items[match.index].text;
+                if (option != value) {
+                    self.text = option;
+                    self.set-selection-offsets(match.prefix-bytes, match.item-bytes);
+                }
+            }
+        }
+        accepted(value) => { root.submit-text(); popup.dismiss-with-transition(); }
+    }
+
+    trigger := FluentPressable {
+        x: root.editable ? root.width - self.width : 0px;
+        width: root.editable ? min(root.width, FluentMetrics.combo-chevron-column) : root.width;
+        height: 100%;
+        enabled: root.enabled;
+        focus-on-press: !root.editable;
+        focus-on-tab-navigation: !root.editable;
+        accessible-role: combobox;
+        accessible-label: root.label;
+        accessible-value: root.editable ? root.edit-text : root.selected-text;
+        accessible-enabled: root.enabled;
+        accessible-expandable: root.item-count > 0;
+        accessible-expanded: root.open;
+        accessible-action-expand => { root.open-popup(); }
+        accessible-action-default => { if (root.open) { popup.dismiss-with-transition(); } else { root.open-popup(); } }
+        activated => { root.open-popup(); }
+        scrolled(event) => {
+            if (!self.enabled || !self.has-focus || event.delta-y == 0px || root.item-count == 0) { return reject; }
+            root.step-selection(event.delta-y < 0px ? ListDirection.next : ListDirection.previous);
+            return accept;
+        }
+
+        appearance := ComboBoxSurface {
+            width: 100%;
+            height: 100%;
+            text: root.selected-index < 0 ? root.placeholder : root.selected-text;
+            placeholder: root.selected-index < 0;
+            state: trigger.state;
+            focus-visible: root.focus-visible;
+            arrow-only: root.editable;
+            editor-focused: editor.has-focus;
+            label-opacity: popup.faceplate-opacity;
+        }
+    }
+
+    popup := OverlayHost {
+        square-top: root.editable && !root.opens-above;
+        square-bottom: root.editable && root.opens-above;
+        active: root.enabled && root.active && root.item-count > 0;
+        area: root.viewport;
+        anchor: root.absolute-position;
+        anchor-height: root.height;
+        positioned-panel: root.geometry.bounds;
+        focus-scope-on-open: false;
+        dismiss-on-escape: !root.editable;
+        outside-pressed => { if (root.editable) { root.submit-text(); } }
+        acrylic: true;
+        split-transition: true;
+
+        // Slot bindings use the host's panel bounds rather than the overlay placeholder's size.
+        FocusScope {
+            x: 0px;
+            y: 0px;
+            width: popup.panel-bounds.width;
+            height: popup.panel-bounds.height;
+            focus-on-click: false;
+            focus-on-tab-navigation: false;
+
+            key-pressed(event) => {
+                if (event.text == Key.Tab || event.text == Key.Backtab) {
+                    popup.dismiss();
+                    return reject;
+                }
+                if (root.dropdown-shortcut(event)) {
+                    if (!event.repeat) { popup.dismiss-with-transition(); }
+                    return accept;
+                }
+                return reject;
+            }
+            capture-key-pressed(event) => {
+                return root.editable ? root.edit-key(event) : reject;
+            }
+
+            list := SelectableList {
+                x: FluentMetrics.control-stroke;
+                y: root.panel-inset;
+                width: max(0px, parent.width - 2 * self.x);
+                height: max(0px, parent.height - 2 * self.y);
+                framed: false;
+                scroll-bar-outset: FluentMetrics.combo-popup-content-margin;
+                item-appearance: ItemAppearance.combo-box;
+                label: root.label;
+                items: root.items;
+                minimum-target: root.minimum-target;
+                selected: root.editable ? (root.popup-focus >= 0 ? [root.popup-focus] : [])
+                    : self.focused-row >= 0 ? [self.focused-row] : selection.selected;
+                preview-index: root.editable && root.open ? root.popup-focus : -1;
+
+                focus-on-init: !root.editable;
+                initial-focus-index: root.opening-index >= 0 ? root.opening-index : root.geometry.first-row;
+                initial-last-visible-row: root.geometry.last-row;
+                changed row-focus-visible => { if (!root.editable) { root.popup-keyboard-focus = self.row-focus-visible; } }
+                focus-row-changed(index) => {
+                    if (!root.editable) {
+                        root.popup-focus = index;
+                        root.popup-keyboard-focus = self.row-focus-visible;
+                    }
+                }
+                row-activated(index, from, control, shift, keyboard) => {
+                    root.choose(index);
+                    popup.dismiss-with-transition();
+                }
+            }
+        }
+    }
+}

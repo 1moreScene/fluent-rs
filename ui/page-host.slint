@@ -1,0 +1,7 @@
+import { FluentMetrics } from "tokens.slint";
+
+export component PageHost inherits Rectangle {
+    out property <bool> compact: self.width < FluentMetrics.compact-width;
+    clip: true;
+    @children
+}

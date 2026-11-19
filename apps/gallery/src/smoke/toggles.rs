@@ -231,12 +231,18 @@ pub(super) fn verify_compact(
     }
     let base_height = gallery.get_check_box_probe().height;
     gallery.set_check_box_label(
-        "A longer CheckBox label that wraps onto several lines inside a compact window.".into(),
+        "A longer CheckBox label that wraps onto several lines inside a compact window. \
+         The label must be long enough for the text to grow beyond the minimum touch target."
+            .into(),
     );
     let wrapped = gallery.get_check_box_probe();
     check(
-        wrapped.height > base_height && wrapped.center.x + wrapped.width / 2. <= window_width,
+        wrapped.height > base_height,
         "long CheckBox text wraps in a compact window",
+    )?;
+    check(
+        wrapped.center.x + wrapped.width / 2. <= window_width,
+        "wrapped CheckBox fits horizontally",
     )?;
     gallery.set_check_box_label("CheckBox".into());
     verify_marks(gallery)

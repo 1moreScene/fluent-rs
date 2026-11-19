@@ -26,6 +26,8 @@ python -B tools/reference_analysis/analyze_textbox.py --gallery-source ../WinUI-
 | 内联清除入口 | 文本非空且已聚焦、可编辑、不换行、单行且控件宽度大于 `5em` 时显示。位于右侧，初始宽度 30，布局后按实际高度形成方形点击区。`IsTabStop=False`。 | `TextBox.cpp` 276–297、829–861 行，`TextBox_themeresources.xaml` 311–323、339 行，`dxaml/xcp/dxaml/lib/TextBox_Partial.cpp` 1096–1121 行 |
 | 清除按钮外观 | 模板图标为 12 逻辑像素，内部绘制区上、右、下各留 4。悬停和按下复用 `SubtleFillColorSecondary/Tertiary`，图标从 `TextFillColorSecondary` 切换到按下时的 `TextFillColorTertiary`。 | `TextBox_themeresources.xaml` 40–47、147–154、176–177、205–246 行 |
 
+2026-11-18 使用本机 WinUI `main` 的 `07e0354d2e06572501ef48078a3cc91138749c9f` 与 Gallery `main` 的 `6de91feccadfbb0a796b71caedead5a2284f730e` 复核内联清除按钮。绘制区左边贴齐右侧按钮列，图标在内缩后的区域居中。实时按钮和 Gallery 状态样本复用该表面。点击范围覆盖整个方形按钮列，包括右侧 4 逻辑像素留白。
+
 [WinUI TextBox 模板](https://github.com/microsoft/microsoft-ui-xaml/blob/354bf6017e6443023214d34309dfdf0fe2d526b1/controls/dev/CommonStyles/TextBox_themeresources.xaml) · [WinUI Gallery TextBox 页面](https://github.com/microsoft/WinUI-Gallery/blob/7360ac322414e118eadfb0c7c2f4ecc31a218f59/WinUIGallery/Samples/TextBox/TextBoxPage.xaml)
 
 ## 主题资源

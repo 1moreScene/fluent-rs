@@ -1,0 +1,93 @@
+import { ButtonState, ButtonSurface } from "button-surface.slint";
+import { ButtonClickMode, FluentPressable } from "interaction.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+export { ButtonClickMode }
+
+// Same button chrome; only the high-contrast resource mapping differs.
+export component RepeatButtonSurface inherits ButtonSurface {
+    contrast-fill: FluentTheme.contrast-button-face;
+    contrast-foreground: root.state == ButtonState.disabled ? FluentTheme.contrast-disabled
+        : root.state == ButtonState.pointer-over || root.state == ButtonState.pressed
+        ? FluentTheme.contrast-highlight : FluentTheme.contrast-text;
+    contrast-border: root.state == ButtonState.disabled ? FluentTheme.contrast-disabled
+        : root.state == ButtonState.pointer-over || root.state == ButtonState.pressed
+        ? FluentTheme.contrast-highlight : FluentTheme.contrast-button-text;
+}
+
+export component RepeatButton inherits FluentPressable {
+    in property <string> text;
+    in property <bool> wrap-text;
+    in property <length> minimum-target;
+    in property <bool> active: true;
+    in property <bool> show-standard-surface: true;
+    in property <duration> delay: FluentMetrics.repeat-button-delay;
+    in property <duration> interval: FluentMetrics.repeat-button-interval;
+    out property <bool> timing-valid: root.delay >= 0ms && root.interval > 0ms;
+    out property <bool> repeating: repeat-timer.running;
+    callback clicked;
+
+    click-mode: ButtonClickMode.press;
+    focus-on-press: true;
+    min-width: root.show-standard-surface ? surface.min-width : 0px;
+    min-height: root.show-standard-surface ? surface.min-height : 0px;
+    preferred-width: root.show-standard-surface ? surface.preferred-width : 0px;
+    preferred-height: root.show-standard-surface ? surface.preferred-height : 0px;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if (root.enabled && root.active) { root.activated(); } }
+    activated => { if (root.enabled && root.active) { root.clicked(); } }
+    capture-key-pressed(event) => {
+        if (root.pressed-key != "" && event.text != " " && event.text != Key.Return) { root.cancel-press(); }
+        return reject;
+    }
+
+    property <bool> waiting-delay: true;
+    property <duration> scheduled-delay: FluentMetrics.repeat-button-delay;
+    property <duration> scheduled-interval: FluentMetrics.repeat-button-interval;
+    property <bool> pointer-request;
+    property <bool> repeat-requested: root.enabled && root.active && root.timing-valid
+        && (root.pressed-key == " " || (root.pointer-request && root.hovered)
+            || (root.click-mode == ButtonClickMode.hover && root.hovered));
+    changed repeat-requested => { root.waiting-delay = true; root.scheduled-delay = root.delay; }
+    changed active => { if (!root.active) { root.stop-repeat(); } }
+    changed enabled => { if (!root.enabled) { root.stop-repeat(); } }
+    focus-left => { root.stop-repeat(); }
+    public function stop-repeat() {
+        root.cancel-press();
+        root.pointer-request = false;
+    }
+    pointer-interaction(event, point) => {
+        if (event.kind == PointerEventKind.cancel) { root.stop-repeat(); }
+        if (event.button == PointerEventButton.left) {
+            if (event.kind == PointerEventKind.down && root.enabled && root.active && root.click-mode != ButtonClickMode.hover) {
+                root.pointer-request = true;
+            }
+            if (event.kind == PointerEventKind.up) { root.pointer-request = false; }
+        }
+    }
+
+    repeat-timer := Timer {
+        running: root.repeat-requested;
+        // Slint treats a zero interval as idle; 1ms schedules a zero Delay on the next UI turn.
+        interval: root.waiting-delay ? max(1ms, root.scheduled-delay) : root.scheduled-interval;
+        triggered => {
+            root.scheduled-interval = root.interval;
+            root.waiting-delay = false;
+            if (root.repeat-requested) { root.activated(); }
+        }
+    }
+
+    surface := RepeatButtonSurface {
+        visible: root.show-standard-surface;
+        width: 100%;
+        height: 100%;
+        text: root.text;
+        state: root.state;
+        focus-visible: root.focus-visible;
+        wrap-text: root.wrap-text;
+        minimum-target: root.minimum-target;
+    }
+}

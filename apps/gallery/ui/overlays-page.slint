@@ -1,0 +1,212 @@
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { Button } from "../../../ui/button.slint";
+import { ContextMenu } from "../../../ui/context-menu.slint";
+import { Tooltip } from "../../../ui/tooltip.slint";
+import { Flyout, OverlayPlacement } from "../../../ui/flyout.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+component InitialAction inherits Button {
+    callback report-focus(bool, bool);
+    init => {
+        self.focus();
+        self.report-focus(self.has-focus, self.focus-visible);
+    }
+    changed has-focus => { self.report-focus(self.has-focus, self.focus-visible); }
+    changed focus-visible => { self.report-focus(self.has-focus, self.focus-visible); }
+}
+
+export component OverlaysPage {
+    in property <OverlayArea> viewport;
+    in property <length> target-size;
+    in property <bool> active;
+    in property <bool> flyout-enabled: true;
+    in-out property <OverlayPlacement> placement: OverlayPlacement.top;
+    out property <bool> flyout-open: details.open;
+    out property <bool> flyout-trigger-focused: trigger.has-focus;
+    out property <bool> flyout-trigger-focus-visible: trigger.focus-visible;
+    out property <bool> flyout-action-focused;
+    out property <bool> flyout-action-focus-visible;
+    out property <OverlayArea> flyout-bounds: details.panel-bounds;
+    out property <OverlayArea> flyout-anchor: {
+        x: trigger.absolute-position.x, y: trigger.absolute-position.y,
+        width: trigger.width, height: trigger.height,
+    };
+    out property <int> confirmations;
+    in property <bool> window-visible;
+    in property <bool> menu-enabled: true;
+    in property <duration> tip-delay: FluentMetrics.tooltip-show-delay;
+    in property <duration> tip-duration: FluentMetrics.tooltip-visible-duration;
+    out property <bool> menu-open: actions.open;
+    out property <bool> menu-trigger-focused: menu-trigger.has-focus;
+    out property <OverlayArea> menu-bounds: actions.panel-bounds;
+    out property <int> menu-focus: actions.focused-index;
+    out property <bool> menu-focus-visible: actions.focus-visible;
+    out property <int> last-command: -1;
+    out property <OverlayArea> menu-anchor: {
+        x: menu-trigger.absolute-position.x, y: menu-trigger.absolute-position.y,
+        width: menu-trigger.width, height: menu-trigger.height,
+    };
+    out property <OverlayArea> tip-anchor: {
+        x: tip-trigger.absolute-position.x, y: tip-trigger.absolute-position.y,
+        width: tip-trigger.width, height: tip-trigger.height,
+    };
+    out property <bool> tip-open: tip.open;
+    out property <bool> tip-pending: tip.pending;
+    out property <bool> tip-trigger-focused: tip-trigger.has-focus;
+    out property <OverlayArea> tip-bounds: tip.panel-bounds;
+    out property <int> tip-activations;
+    public function dismiss-tip() { tip.dismiss(); }
+
+    examples-scroll := FluentScrollView {
+        width: 100%;
+        height: 100%;
+        content-height: max(self.height, examples.preferred-height);
+
+        examples := VerticalLayout {
+            x: 0px;
+            y: 0px;
+            width: examples-scroll.content-width;
+            height: parent.height;
+            alignment: start;
+            padding: FluentMetrics.focus-outset;
+            spacing: FluentMetrics.spacing-large;
+
+            FlexboxLayout {
+                alignment: start;
+                spacing: FluentMetrics.spacing-medium;
+                trigger := Button {
+                    text: "Review changes";
+                    minimum-target: root.target-size;
+                    enabled: root.flyout-enabled;
+                    accessible-expanded: details.open;
+                    clicked => {
+                        self.focus();
+                        details.show();
+                    }
+                }
+                Button {
+                    text: root.placement == OverlayPlacement.top ? "Place to the right" : "Place above";
+                    minimum-target: root.target-size;
+                    clicked => {
+                        root.placement = root.placement == OverlayPlacement.top
+                            ? OverlayPlacement.right : OverlayPlacement.top;
+                    }
+                }
+            }
+            FlexboxLayout {
+                alignment: start;
+                spacing: FluentMetrics.spacing-medium;
+
+                menu-trigger := Button {
+                    text: "Workspace actions";
+                    minimum-target: root.target-size;
+                    enabled: root.menu-enabled;
+                    accessible-expanded: actions.open;
+                    capture-key-pressed(event) => {
+                        if (event.text == Key.Menu || (event.text == Key.F10 && event.modifiers.shift)) {
+                            if (!event.repeat && self.enabled) { actions.show(); }
+                            return accept;
+                        }
+                        return reject;
+                    }
+                    secondary-clicked(position) => {
+                        self.focus();
+                        actions.show-at(position);
+                    }
+                    clicked => {
+                        self.focus();
+                        actions.show();
+                    }
+                }
+                tip-trigger := Button {
+                    text: mod(root.tip-activations, 2) == 0 ? "Pin workspace" : "Unpin workspace";
+                    accessible-description: tip.text;
+                    minimum-target: root.target-size;
+                    clicked => {
+                        tip.dismiss();
+                        root.tip-activations += 1;
+                    }
+                }
+            }
+            if root.last-command >= 0 : FluentText {
+                text: root.last-command == 0 ? "Rename selected" : "Duplicate selected";
+            }
+            if root.confirmations > 0 : FluentText { text: "Changes confirmed"; }
+        }
+    }
+
+    actions := ContextMenu {
+        active: root.active && root.menu-enabled;
+        viewport: root.viewport;
+        anchor: root.menu-anchor;
+        label: "Workspace actions";
+        requested-width: 192px;
+        minimum-target: root.target-size;
+        items: [
+            { text: "Rename", disabled: false },
+            { text: "Restore", disabled: true },
+            { text: "Duplicate", disabled: false },
+        ];
+        invoked(index) => { root.last-command = index; }
+    }
+
+    details := Flyout {
+        viewport: root.viewport;
+        anchor: root.flyout-anchor;
+        placement: root.placement;
+        requested-width: 260px;
+        requested-height: 156px;
+        active: root.active && root.flyout-enabled;
+        focus-content: true;
+
+        flyout-scroll := FluentScrollView {
+            x: FluentMetrics.control-stroke;
+            y: FluentMetrics.control-stroke;
+            width: max(0px, details.panel-bounds.width - 2 * self.x);
+            height: max(0px, details.panel-bounds.height - 2 * self.y);
+            content-height: max(self.height, content.preferred-height);
+            content := VerticalLayout {
+                x: 0px;
+                y: 0px;
+                width: flyout-scroll.content-width;
+                height: self.preferred-height;
+                padding-left: FluentMetrics.spacing-large;
+                padding-right: FluentMetrics.spacing-large;
+                padding-top: FluentMetrics.flyout-padding-top;
+                padding-bottom: FluentMetrics.flyout-padding-bottom;
+                spacing: FluentMetrics.spacing-large;
+                FluentText {
+                    text: "Apply changes to this workspace?";
+                    wrap: word-wrap;
+                }
+                InitialAction {
+                    text: "Apply";
+                    minimum-target: root.target-size;
+                    report-focus(focused, visible) => {
+                        root.flyout-action-focused = focused;
+                        root.flyout-action-focus-visible = visible;
+                    }
+                    clicked => {
+                        root.confirmations += 1;
+                        details.dismiss();
+                    }
+                }
+            }
+        }
+    }
+
+    tip := Tooltip {
+        active: root.active && root.window-visible && !actions.open && !details.open;
+        viewport: { x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height };
+        anchor: root.tip-anchor;
+        text: mod(root.tip-activations, 2) == 0 ? "Keep this workspace in the shortcuts list."
+            : "Remove this workspace from the shortcuts list.";
+        hovered: tip-trigger.hovered;
+        keyboard-focused: tip-trigger.focus-visible;
+        pressed: tip-trigger.pressed;
+        show-delay: root.tip-delay;
+        visible-duration: root.tip-duration;
+    }
+}

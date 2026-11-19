@@ -3,6 +3,10 @@ import { FluentMetrics, FluentTheme } from "tokens.slint";
 export component FluentSurface inherits Rectangle {
     background: FluentTheme.card-fill;
     border-radius: FluentMetrics.control-radius;
+    border-top-left-radius: self.border-radius;
+    border-top-right-radius: self.border-radius;
+    border-bottom-left-radius: self.border-radius;
+    border-bottom-right-radius: self.border-radius;
     border-width: FluentMetrics.control-stroke;
     border-color: FluentTheme.card-stroke;
 }

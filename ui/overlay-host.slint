@@ -1,0 +1,384 @@
+import { FluentPopupMotion, PopupMotionProfile } from "popup-motion.slint";
+import { AcrylicBackdrop, FluentMaterials } from "material.slint";
+import { FluentLiveAcrylic } from "live-acrylic.slint";
+import { FluentFocus, FluentPointerArea } from "interaction.slint";
+import { FluentMotion } from "motion.slint";
+import { NavigationPaneMotion } from "navigation-motion.slint";
+import { FluentElevatedSurface } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+import { OverlayArea, OverlayLayout, OverlayPlacement } from "overlay-placement.slint";
+export { OverlayArea, OverlayPlacement }
+
+// Anchors and available bounds use window-local coordinates, including safe area insets.
+export component OverlayHost {
+    in property <OverlayArea> area;
+    in property <Point> anchor;
+    in property <length> anchor-height;
+    in property <length> anchor-width;
+    in property <OverlayPlacement> preferred-placement;
+    in property <bool> center-on-anchor;
+    in property <length> anchor-gap: FluentMetrics.spacing-medium;
+    in property <length> viewport-inset: FluentMetrics.spacing-medium;
+    in property <length> preferred-panel-width;
+    in property <length> preferred-panel-height;
+    in property <bool> modal;
+    in property <bool> acrylic;
+    in property <bool> luminosity-acrylic;
+    in property <bool> live-acrylic;
+    in property <bool> edge-reveal;
+    in property <length> edge-reveal-offset;
+    in property <bool> split-transition;
+    in property <bool> scale-transition;
+    in property <bool> flyout-transition;
+    in property <bool> portable-flyout-motion;
+    in property <bool> menu-transition;
+    in property <bool> left-pane-transition;
+    in property <length> retained-pane-width;
+    in property <bool> dismiss-on-resize: true;
+    in property <OverlayArea> positioned-panel;
+    in property <bool> use-positioned-panel;
+    in property <bool> clip-content: true;
+    in property <bool> active: true;
+    in property <bool> focus-scope-on-open: true;
+    in property <bool> dismiss-on-escape: true;
+    in property <bool> square-top;
+    in property <bool> square-bottom;
+    in property <brush> surface-fill: root.blur && root.live-acrylic ? transparent
+        : root.blur && !root.luminosity-acrylic
+        ? FluentTheme.acrylic-in-app-tint : FluentTheme.acrylic-fallback;
+    in property <brush> surface-stroke: FluentTheme.flyout-stroke;
+    in property <length> surface-border-width: FluentMetrics.flyout-border-width;
+    in property <bool> far-edge-stroke;
+    in property <brush> scrim-fill: FluentTheme.modal-scrim;
+    in property <OverlayArea> scrim-bounds: root.area;
+    callback outside-pressed;
+    out property <bool> open: overlay.is-open;
+    out property <bool> closing;
+    out property <bool> acrylic-applied: root.acrylic-image.width > 0;
+    out property <float> pane-reveal: pane-motion.progress;
+    out property <float> faceplate-opacity: !root.split-transition || !FluentMotion.enabled || !root.open ? 1
+        : root.closing ? 1 - root.close-opacity : root.open-faceplate;
+    out property <OverlayArea> panel-bounds: (root.use-positioned-panel || root.split-transition || root.left-pane-transition) ? root.positioned-panel : root.modal ? {
+        x: root.area.x + (root.area.width - root.modal-width) / 2,
+        y: root.area.y + (root.area.height - root.modal-height) / 2,
+        width: root.modal-width, height: root.modal-height,
+    } : OverlayLayout.place-with-inset(root.area, { x: root.anchor.x, y: root.anchor.y,
+        width: root.anchor-width, height: root.anchor-height }, root.preferred-panel-width,
+        root.preferred-panel-height, root.preferred-placement, root.center-on-anchor, root.anchor-gap, root.viewport-inset);
+
+    property <PopupMotionProfile> flyout-motion: root.portable-flyout-motion && !FluentPopupMotion.has-profile
+        ? FluentPopupMotion.portable-profile : FluentPopupMotion.profile;
+    property <bool> blur: FluentMaterials.in-app-enabled(root.acrylic);
+    property <image> acrylic-image;
+    property <OverlayArea> captured-bounds;
+    property <color> recipe-luminosity: FluentTheme.acrylic-luminosity;
+    property <color> captured-luminosity;
+    changed recipe-luminosity => {
+        if (root.recipe-luminosity != root.captured-luminosity) { root.acrylic-image = @image-url(""); }
+    }
+    changed blur => { if (!root.blur) { root.acrylic-image = @image-url(""); } }
+    property <length> margin: FluentMetrics.spacing-medium;
+    property <length> modal-width: min(root.preferred-panel-width, max(0px, root.area.width - 2 * root.margin));
+    property <length> modal-height: min(root.preferred-panel-height, max(0px, root.area.height - 2 * root.margin));
+    property <float> open-faceplate: root.open ? 0.5 : 1;
+    property <float> remaining-close: root.closing ? 0 : 1;
+    property <float> close-opacity: min(1, root.remaining-close * FluentMotion.dropdown-close / FluentMotion.dropdown-fade);
+    property <length> visible-pane-width: min(root.retained-pane-width, root.panel-bounds.width)
+        + max(0px, root.panel-bounds.width - root.retained-pane-width) * root.pane-reveal;
+    pane-motion := NavigationPaneMotion {
+        overlay: true;
+        animate-changes: root.left-pane-transition && root.open;
+        expanded: root.left-pane-transition && root.open && !root.closing;
+    }
+    animate open-faceplate {
+        enabled: root.open && root.split-transition && FluentMotion.enabled;
+        duration: FluentMotion.dropdown-fade;
+        easing: linear;
+    }
+    animate remaining-close {
+        enabled: root.closing;
+        duration: FluentMotion.dropdown-close;
+        easing: linear;
+    }
+
+    public function show() {
+        if (root.active && !root.open && root.panel-bounds.width > 0px && root.panel-bounds.height > 0px) {
+            if (root.blur && root.luminosity-acrylic && !root.live-acrylic) {
+                root.captured-bounds = root.panel-bounds;
+                root.captured-luminosity = root.recipe-luminosity;
+                root.acrylic-image = AcrylicBackdrop.capture({
+                    bounds: root.panel-bounds, scrim-bounds: root.scrim-bounds,
+                    scrim: root.left-pane-transition ? FluentTheme.navigation-light-dismiss : transparent,
+                    fallback: FluentTheme.acrylic-fallback, blur-radius: FluentMetrics.navigation-acrylic-blur,
+                    luminosity: FluentTheme.acrylic-luminosity, tint: FluentTheme.acrylic-color-tint, noise-opacity: 0.02,
+                });
+            }
+            overlay.show();
+        }
+    }
+    public function dismiss() {
+        close-timer.stop();
+        if (root.open) { overlay.close(); }
+        root.acrylic-image = @image-url("");
+        root.closing = false;
+    }
+    public function dismiss-with-transition() {
+        if (root.open && !root.closing) {
+            if ((root.split-transition || root.scale-transition || root.left-pane-transition || root.edge-reveal || root.menu-transition || (root.flyout-transition && root.flyout-motion.exit-opacity.duration > 0ms)) && FluentMotion.enabled) {
+                root.closing = true;
+                close-timer.start();
+            } else {
+                root.dismiss();
+            }
+        }
+    }
+    changed open => {
+        if (!root.open) { root.acrylic-image = @image-url(""); }
+        if (!root.open && root.closing) {
+            close-timer.stop();
+            root.closing = false;
+        }
+    }
+    changed area => { if (root.dismiss-on-resize) { root.dismiss(); } }
+    changed active => { if (!root.active) { root.dismiss(); } }
+    changed panel-bounds => {
+        if (root.panel-bounds.width <= 0px || root.panel-bounds.height <= 0px) { root.dismiss(); }
+        if (root.panel-bounds != root.captured-bounds) { root.acrylic-image = @image-url(""); }
+    }
+
+    close-timer := Timer {
+        // Animation and input share a lifetime, including when reduced motion is active.
+        interval: root.left-pane-transition ? FluentMotion.navigation-drawer-exit
+            : root.menu-transition ? FluentMotion.dropdown-fade
+            : root.flyout-transition ? root.flyout-motion.exit-opacity.delay + root.flyout-motion.exit-opacity.duration
+            : root.scale-transition ? FluentMotion.dialog-exit : FluentMotion.dropdown-close;
+        running: false;
+        triggered => { root.dismiss(); }
+    }
+
+    overlay := PopupWindow {
+        x: root.area.x - root.absolute-position.x;
+        y: root.area.y - root.absolute-position.y;
+        width: root.area.width;
+        height: root.area.height;
+        // Dismissal is handled inside the full-window overlay so modal
+        // overlays also block pointer events outside the safe-area bounds.
+        close-policy: no-auto-close;
+
+        Rectangle {
+            width: parent.width;
+            height: parent.height;
+            Rectangle {
+                x: root.scrim-bounds.x - root.area.x;
+                y: root.scrim-bounds.y - root.area.y;
+                width: root.scrim-bounds.width;
+                height: root.scrim-bounds.height;
+                background: root.modal || root.left-pane-transition ? root.scrim-fill : transparent;
+                opacity: root.left-pane-transition ? root.pane-reveal : reveal.dialog-opacity;
+            }
+
+            FluentPointerArea {
+                interaction-event(event) => {
+                    if (!root.modal && event.kind == PointerEventKind.down) {
+                        let x = self.mouse-x + root.area.x;
+                        let y = self.mouse-y + root.area.y;
+                        let panel = root.panel-bounds;
+                        let width = root.left-pane-transition ? root.visible-pane-width : panel.width;
+                        let panel-y = panel.y + root.edge-reveal-offset;
+                        if (x < panel.x || x >= panel.x + width || y < panel-y || y >= panel-y + panel.height) {
+                            root.outside-pressed();
+                            root.dismiss-with-transition();
+                        }
+                    }
+                }
+            }
+        }
+
+        reveal := Rectangle {
+            property <bool> ready;
+            property <bool> animated: root.split-transition && FluentMotion.enabled;
+            property <length> full-height: root.panel-bounds.height;
+            property <length> center: clamp(root.anchor.y + root.anchor-height / 2 - root.panel-bounds.y, 0px, full-height);
+            property <length> near-edge: min(center, full-height - center);
+            property <float> collapsed-ratio: root.closing ? 0.15 : 0.5;
+            // WinUI expands a clip in both directions around the faceplate center.
+            property <length> collapsed-radius: max(full-height * collapsed-ratio / 2,
+                full-height * collapsed-ratio - near-edge);
+            property <length> radius: !animated || (ready && !root.closing)
+                ? full-height - near-edge : collapsed-radius;
+            property <bool> reveals-up: root.panel-bounds.y < root.anchor.y;
+            property <float> edge-progress: !root.edge-reveal || !FluentMotion.enabled || (ready && !root.closing) ? 1 : 0;
+            property <bool> animate-menu: root.menu-transition && FluentMotion.enabled;
+            property <float> menu-progress: !animate-menu || ready ? 1 : 0.5;
+            property <float> menu-close-progress: 1;
+            property <bool> menu-closing: root.menu-transition && root.closing;
+            changed menu-closing => {
+                if (self.menu-closing) { self.menu-close-progress = self.menu-progress; }
+            }
+            property <length> menu-offset: full-height * (1 - (menu-closing ? menu-close-progress : menu-progress));
+            property <float> menu-opacity: menu-closing ? 0 : 1;
+            property <length> clip-top: root.menu-transition ? (reveals-up ? menu-offset : 0px)
+                : root.edge-reveal && reveals-up ? full-height * (1 - edge-progress) : max(0px, center - radius);
+            property <length> clip-bottom: root.menu-transition ? (reveals-up ? full-height : full-height - menu-offset)
+                : root.edge-reveal && !reveals-up ? full-height * edge-progress : min(full-height, center + radius);
+            property <bool> animate-dialog: root.scale-transition && FluentMotion.enabled;
+            property <float> dialog-opacity: !animate-dialog || (ready && !root.closing) ? 1 : 0;
+            property <float> dialog-scale: !animate-dialog || (ready && !root.closing) ? 1 : 1.05;
+            property <bool> animate-flyout: root.flyout-transition && FluentMotion.enabled;
+            property <bool> animate-flyout-position: animate-flyout && root.flyout-motion.enter-translation.duration > 0ms;
+            property <bool> animate-flyout-opacity: animate-flyout && (root.closing
+                ? root.flyout-motion.exit-opacity.duration > 0ms : root.flyout-motion.enter-opacity.duration > 0ms);
+            property <bool> flyout-exit: root.closing && animate-flyout && root.flyout-motion.exit-opacity.duration > 0ms;
+            property <float> enter-opacity: !animate-flyout || root.flyout-motion.enter-opacity.duration <= 0ms ? 1
+                : !ready ? root.flyout-motion.enter-opacity-from : root.flyout-motion.enter-opacity-to;
+            property <float> exit-opacity: !flyout-exit ? root.flyout-motion.exit-opacity-from : root.flyout-motion.exit-opacity-to;
+            property <bool> horizontal-flyout: root.preferred-placement == OverlayPlacement.left || root.preferred-placement == OverlayPlacement.right;
+            property <length> flyout-offset: !animate-flyout-position || ready ? 0px : FluentMotion.navigation-flyout-offset;
+            property <length> flyout-x: !horizontal-flyout ? 0px
+                : (root.panel-bounds.x >= root.anchor.x ? -1 : 1) * flyout-offset;
+            property <length> flyout-y: horizontal-flyout ? 0px
+                : (root.panel-bounds.y >= root.anchor.y ? -1 : 1) * flyout-offset;
+            property <float> flyout-opacity: flyout-exit ? exit-opacity : enter-opacity;
+
+            x: root.panel-bounds.x - root.area.x + flyout-x;
+            y: root.panel-bounds.y - root.area.y + clip-top + flyout-y + root.edge-reveal-offset;
+            width: root.left-pane-transition ? root.visible-pane-width : root.panel-bounds.width;
+            height: max(0px, clip-bottom - clip-top);
+            opacity: root.menu-transition ? menu-opacity : root.flyout-transition ? flyout-opacity
+                : root.scale-transition ? dialog-opacity : root.closing && !root.left-pane-transition && !root.edge-reveal ? root.close-opacity : 1;
+            transform-origin: { x: self.width / 2, y: self.height / 2 };
+            transform-scale-x: dialog-scale * 100%;
+            transform-scale-y: self.transform-scale-x;
+            clip: (!root.menu-transition && self.height < full-height) || (root.left-pane-transition && self.width < root.panel-bounds.width);
+            init => { self.ready = true; }
+            animate menu-progress {
+                enabled: reveal.animate-menu;
+                duration: FluentMotion.control-normal-duration;
+                easing: FluentMotion.control-fast-out-slow-in;
+            }
+            animate menu-opacity {
+                enabled: reveal.animate-menu && root.closing;
+                duration: FluentMotion.dropdown-fade;
+                easing: linear;
+            }
+            animate edge-progress {
+                enabled: root.edge-reveal && FluentMotion.enabled;
+                duration: root.closing ? FluentMotion.control-fast-duration : FluentMotion.control-normal-duration;
+                easing: FluentMotion.control-fast-out-slow-in;
+            }
+            animate radius {
+                enabled: reveal.animated;
+                duration: root.closing ? FluentMotion.dropdown-close : FluentMotion.dropdown-reveal;
+                easing: FluentMotion.control-fast-out-slow-in;
+            }
+            animate dialog-opacity {
+                enabled: reveal.animate-dialog;
+                duration: FluentMotion.dialog-fade;
+                easing: linear;
+            }
+            animate dialog-scale {
+                enabled: reveal.animate-dialog;
+                duration: root.closing ? FluentMotion.dialog-exit : FluentMotion.dialog-enter;
+                easing: FluentMotion.control-fast-out-slow-in;
+            }
+            animate flyout-offset {
+                enabled: reveal.animate-flyout-position;
+                delay: root.flyout-motion.enter-translation.delay;
+                duration: root.flyout-motion.enter-translation.duration;
+                easing: root.flyout-motion.enter-translation.curve;
+            }
+            animate flyout-opacity {
+                enabled: reveal.animate-flyout-opacity;
+                delay: root.closing ? root.flyout-motion.exit-opacity.delay : root.flyout-motion.enter-opacity.delay;
+                duration: root.closing ? root.flyout-motion.exit-opacity.duration : root.flyout-motion.enter-opacity.duration;
+                easing: root.closing ? root.flyout-motion.exit-opacity.curve : root.flyout-motion.enter-opacity.curve;
+            }
+
+            panel-surface := FluentElevatedSurface {
+                x: root.left-pane-transition && root.retained-pane-width <= 0px ? reveal.width - root.panel-bounds.width : 0px;
+                // The menu chrome follows the reveal. Its children keep their full layout
+                // and slide through the clipped opening.
+                y: root.menu-transition ? 0px : -reveal.clip-top;
+                width: root.panel-bounds.width;
+                height: root.menu-transition ? reveal.height : reveal.full-height;
+                background: root.surface-fill;
+                border-color: root.surface-stroke;
+                border-width: root.surface-border-width;
+                border-top-left-radius: root.square-top ? 0px : FluentMetrics.overlay-radius;
+                border-top-right-radius: root.left-pane-transition ? FluentMetrics.overlay-radius : self.border-top-left-radius;
+                border-bottom-left-radius: root.square-bottom ? 0px : FluentMetrics.overlay-radius;
+                border-bottom-right-radius: root.left-pane-transition ? FluentMetrics.overlay-radius : self.border-bottom-left-radius;
+                backdrop-blur: root.blur && !root.luminosity-acrylic && !root.live-acrylic ? FluentMetrics.acrylic-preview-blur : 0px;
+                clip: root.clip-content;
+
+                if root.live-acrylic && root.blur : FluentLiveAcrylic {
+                    x: panel-surface.border-width;
+                    y: self.x;
+                    width: max(0px, parent.width - 2 * self.x);
+                    height: max(0px, parent.height - 2 * self.y);
+                    border-top-left-radius: max(0px, panel-surface.border-top-left-radius - self.x);
+                    border-top-right-radius: max(0px, panel-surface.border-top-right-radius - self.x);
+                    border-bottom-left-radius: max(0px, panel-surface.border-bottom-left-radius - self.x);
+                    border-bottom-right-radius: max(0px, panel-surface.border-bottom-right-radius - self.x);
+                }
+                if root.far-edge-stroke : Rectangle {
+                    x: FluentMetrics.overlay-radius;
+                    y: reveal.reveals-up ? 0px : parent.height - self.height;
+                    width: max(0px, parent.width - 2 * self.x);
+                    height: FluentMetrics.control-stroke;
+                    background: root.surface-stroke;
+                }
+                if root.acrylic-image.width > 0 : Image {
+                    x: 0px;
+                    y: 0px;
+                    width: 100%;
+                    height: 100%;
+                    source: root.acrylic-image;
+                    image-fit: fill;
+                    accessible-role: none;
+                }
+                if root.acrylic-image.width > 0 : Rectangle {
+                    x: 0px;
+                    y: 0px;
+                    width: 100%;
+                    height: 100%;
+                    border-width: panel-surface.border-width;
+                    border-color: panel-surface.border-color;
+                    border-top-left-radius: panel-surface.border-top-left-radius;
+                    border-top-right-radius: panel-surface.border-top-right-radius;
+                    border-bottom-left-radius: panel-surface.border-bottom-left-radius;
+                    border-bottom-right-radius: panel-surface.border-bottom-right-radius;
+                }
+
+                scope := FocusScope {
+                    y: root.menu-transition && !reveal.reveals-up ? -reveal.menu-offset : 0px;
+                    width: 100%;
+                    height: reveal.full-height;
+                    focus-on-click: false;
+                    focus-on-tab-navigation: false;
+                    init => { if (root.focus-scope-on-open) { self.focus(); } }
+                    capture-key-pressed(event) => {
+                        FluentFocus.keyboard-input = true;
+                        if (root.closing) { return accept; }
+                        if ((root.split-transition || root.left-pane-transition) && root.dismiss-on-escape && event.text == Key.Escape) {
+                            root.dismiss-with-transition();
+                            return accept;
+                        }
+                        return reject;
+                    }
+                    key-pressed(event) => {
+                        if (root.dismiss-on-escape && event.text == Key.Escape) {
+                            root.dismiss-with-transition();
+                            return accept;
+                        }
+                        return reject;
+                    }
+                    @children
+                }
+            }
+        }
+
+        if root.closing : TouchArea { }
+    }
+}

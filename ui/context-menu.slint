@@ -1,0 +1,64 @@
+import { ItemData } from "item-presenter.slint";
+import { OverlayArea, OverlayHost } from "overlay-host.slint";
+import { MenuPresenter } from "menu-presenter.slint";
+import { FluentMetrics } from "tokens.slint";
+
+export component ContextMenu {
+    in property <OverlayArea> viewport;
+    in property <OverlayArea> anchor;
+    in property <[ItemData]> items;
+    in property <string> label;
+    in property <length> requested-width: FluentMetrics.flyout-min-width;
+    in property <length> minimum-target;
+    in property <bool> active: true;
+    out property <bool> open: host.open;
+    out property <OverlayArea> panel-bounds: host.panel-bounds;
+    out property <int> focused-index: root.open ? root.focus-index : -1;
+    out property <bool> focus-visible: root.open && root.row-focus-visible;
+    callback invoked(int);
+
+    property <bool> pointer-placement;
+    property <Point> position;
+    property <int> focus-index: -1;
+    property <bool> row-focus-visible;
+    public function show() {
+        if (!root.open) {
+            root.pointer-placement = false;
+            host.show();
+        }
+    }
+    public function show-at(position: Point) {
+        if (!root.open) {
+            root.pointer-placement = true;
+            root.position = position;
+            host.show();
+        }
+    }
+    public function dismiss() { host.dismiss(); }
+    changed items => { root.dismiss(); }
+
+    host := OverlayHost {
+        active: root.active && root.items.length > 0;
+        area: root.viewport;
+        anchor: root.pointer-placement ? root.position : { x: root.anchor.x, y: root.anchor.y };
+        anchor-height: root.pointer-placement ? 0px : root.anchor.height;
+        anchor-gap: root.pointer-placement ? 0px : FluentMetrics.spacing-medium;
+        preferred-panel-width: clamp(root.requested-width, FluentMetrics.flyout-min-width, FluentMetrics.flyout-max-width);
+        preferred-panel-height: FluentMetrics.menu-height(root.items.length, root.minimum-target);
+        focus-scope-on-open: false;
+
+        MenuPresenter {
+            width: host.panel-bounds.width;
+            height: host.panel-bounds.height;
+            items: root.items;
+            label: root.label;
+            minimum-target: root.minimum-target;
+            focus-changed(index, visible) => {
+                root.focus-index = index;
+                root.row-focus-visible = visible;
+            }
+            dismiss => { host.dismiss(); }
+            invoked(index) => { root.invoked(index); }
+        }
+    }
+}

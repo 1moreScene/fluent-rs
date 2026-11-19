@@ -1,0 +1,93 @@
+import { FluentMotion } from "motion.slint";
+import { NavigationClock } from "navigation-motion.slint";
+import { PageHost } from "page-host.slint";
+
+export enum NavigationAction { initial, navigate, back, forward }
+export enum NavigationTransition { entrance, from-left, from-right }
+export struct FrameEntry { page: int, transition: NavigationTransition }
+export struct PageRoute {
+    current: int,
+    outgoing: int,
+    elapsed: duration,
+    backward: bool,
+    transition: NavigationTransition,
+}
+
+export global FrameJournal {
+    pure callback append([FrameEntry], int, FrameEntry, int) -> [FrameEntry];
+}
+
+// The application declares its Pages and uses indices as stable route identifiers.
+export component Frame inherits PageHost {
+    in property <int> page-count;
+    in property <int> initial-page: -1;
+    // Zero preserves the full journal. A host can bound its retained history.
+    in property <int> history-limit;
+    out property <int> current-page: root.cursor >= 0 ? root.journal[root.cursor].page : -1;
+    out property <int> history-length: root.journal.length;
+    out property <bool> can-go-back: root.cursor > 0;
+    out property <bool> can-go-forward: root.cursor + 1 < root.journal.length;
+    out property <bool> transitioning: clock.running;
+    out property <PageRoute> route: {
+        current: root.current-page, outgoing: clock.running ? root.leaving : -1,
+        elapsed: clock.elapsed, backward: root.backwards, transition: root.transition,
+    };
+    callback navigated(int, NavigationAction);
+
+    property <[FrameEntry]> journal;
+    property <int> cursor: -1;
+    property <int> leaving: -1;
+    property <bool> backwards;
+    property <NavigationTransition> transition;
+
+    init => {
+        if (root.initial-page >= 0 && root.initial-page < root.page-count) {
+            root.journal = [{ page: root.initial-page, transition: NavigationTransition.entrance }];
+            root.cursor = 0;
+            root.navigated(root.current-page, NavigationAction.initial);
+        }
+    }
+
+    public function navigate(page: int) -> bool {
+        return root.navigate-with-transition(page, NavigationTransition.entrance);
+    }
+
+    public function navigate-with-transition(page: int, direction: NavigationTransition) -> bool {
+        if (page < 0 || page >= root.page-count || page == root.current-page) { return false; }
+        let previous = root.current-page;
+        root.journal = FrameJournal.append(root.journal, root.cursor + 1,
+            { page: page, transition: direction }, root.history-limit);
+        root.cursor = root.journal.length - 1;
+        root.complete-navigation(previous, NavigationAction.navigate, direction);
+        return true;
+    }
+
+    public function go-back() -> bool {
+        if (!root.can-go-back) { return false; }
+        let previous = root.current-page;
+        let direction = root.journal[root.cursor].transition;
+        root.cursor -= 1;
+        root.complete-navigation(previous, NavigationAction.back, direction);
+        return true;
+    }
+
+    public function go-forward() -> bool {
+        if (!root.can-go-forward) { return false; }
+        let previous = root.current-page;
+        root.cursor += 1;
+        root.complete-navigation(previous, NavigationAction.forward, root.journal[root.cursor].transition);
+        return true;
+    }
+
+    function complete-navigation(previous: int, action: NavigationAction, direction: NavigationTransition) {
+        root.backwards = action == NavigationAction.back;
+        root.transition = direction;
+        root.leaving = previous;
+        if (previous >= 0) { clock.start(); }
+        root.navigated(root.current-page, action);
+    }
+
+    clock := NavigationClock {
+        interval: FluentMotion.navigation-page-exit + FluentMotion.navigation-page-enter;
+    }
+}

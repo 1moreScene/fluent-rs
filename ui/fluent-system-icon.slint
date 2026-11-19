@@ -1,0 +1,10 @@
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export component FluentSystemIcon inherits Image {
+    in property <brush> foreground: FluentTheme.text-primary;
+    width: FluentMetrics.navigation-icon-size;
+    height: self.width;
+    image-fit: contain;
+    colorize: root.foreground;
+    accessible-role: none;
+}

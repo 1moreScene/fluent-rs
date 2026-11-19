@@ -1,0 +1,216 @@
+import { Button, ButtonVariant } from "button.slint";
+import { FluentIcon, FluentSurface, FluentText } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export enum InfoBarSeverity { informational, success, warning, error }
+export enum InfoBarCloseReason { close-button, programmatic }
+
+export component InfoBar inherits Rectangle {
+    in-out property <bool> is-open;
+    in property <InfoBarSeverity> severity;
+    in property <string> title;
+    in property <string> message;
+    in property <string> action-text;
+    in property <bool> closable: true;
+    in property <bool> icon-visible: true;
+    in property <length> minimum-target;
+    out property <bool> shown: root.presented;
+    out property <bool> stacked: banner.stacked;
+    out property <bool> close-focused: close-button.has-focus;
+    out property <length> message-height: message-text.height;
+    out property <Point> close-center: {
+        x: close-button.absolute-position.x + close-button.width / 2,
+        y: close-button.absolute-position.y + close-button.height / 2,
+    };
+    out property <Point> icon-center: {
+        x: severity-icon.absolute-position.x + severity-icon.width / 2,
+        y: severity-icon.absolute-position.y + severity-icon.height / 2,
+    };
+
+    callback action-clicked;
+    callback close-button-clicked;
+    callback closing(InfoBarCloseReason) -> bool;
+    callback closed(InfoBarCloseReason);
+    closing(reason) => { return true; }
+
+    property <bool> presented;
+    property <bool> resolving-close;
+    property <length> stroke: FluentTheme.high-contrast ? FluentMetrics.focus-outer-stroke : FluentMetrics.control-stroke;
+    property <length> close-size: max(root.minimum-target, FluentMetrics.info-bar-close-size);
+    property <length> close-space: root.closable ? root.close-size + 2 * FluentMetrics.info-bar-close-margin : 0px;
+    property <bool> urgent: root.severity == InfoBarSeverity.warning || root.severity == InfoBarSeverity.error;
+
+    visible: root.presented;
+    min-height: root.presented ? max(FluentMetrics.info-bar-min-height, root.close-space, banner.height) + 2 * root.stroke : 0px;
+    preferred-height: self.min-height;
+    vertical-stretch: 0;
+    accessible-role: region;
+    accessible-label: root.severity-name() + (root.title == "" ? "" : " " + root.title);
+    accessible-description: root.message;
+    accessible-live-region: root.urgent ? assertive : polite;
+
+    init => { root.presented = root.is-open; }
+    changed is-open => {
+        if (root.is-open) { root.presented = true; }
+        else { root.request-close(InfoBarCloseReason.programmatic); }
+    }
+
+    public function show() {
+        if (!root.resolving-close) {
+            root.presented = true;
+            root.is-open = true;
+        }
+    }
+    public function close() { root.request-close(InfoBarCloseReason.programmatic); }
+
+    function request-close(reason: InfoBarCloseReason) {
+        if (!root.presented || root.resolving-close) { return; }
+        root.resolving-close = true;
+        if (reason == InfoBarCloseReason.close-button) { root.close-button-clicked(); }
+        root.is-open = false;
+        let accepted = root.closing(reason);
+        if (accepted) {
+            if (close-button.has-focus) { close-button.clear-focus(); }
+            if (action.has-focus) { action.clear-focus(); }
+        }
+        root.presented = !accepted;
+        root.is-open = !accepted;
+        root.resolving-close = false;
+        if (accepted) { root.closed(reason); }
+    }
+
+    pure function severity-name() -> string {
+        if (root.severity == InfoBarSeverity.error) { return @tr("Error"); }
+        if (root.severity == InfoBarSeverity.warning) { return @tr("Warning"); }
+        if (root.severity == InfoBarSeverity.success) { return @tr("Success"); }
+        return @tr("Information");
+    }
+
+    FluentSurface {
+        width: 100%;
+        height: 100%;
+        border-width: root.stroke;
+        background: FluentTheme.high-contrast ? FluentTheme.contrast-surface
+            : root.severity == InfoBarSeverity.error ? FluentTheme.system-critical-background
+            : root.severity == InfoBarSeverity.warning ? FluentTheme.system-caution-background
+            : root.severity == InfoBarSeverity.success ? FluentTheme.system-success-background
+            : FluentTheme.system-attention-background;
+    }
+
+    severity-icon := Rectangle {
+        x: root.stroke + FluentMetrics.info-bar-left-padding;
+        y: root.stroke + FluentMetrics.info-bar-left-padding;
+        width: FluentMetrics.info-bar-icon-size;
+        height: self.width;
+        visible: root.icon-visible;
+        border-radius: self.width / 2;
+        background: FluentTheme.high-contrast ? FluentTheme.contrast-highlight
+            : root.severity == InfoBarSeverity.error ? FluentTheme.system-critical
+            : root.severity == InfoBarSeverity.warning ? FluentTheme.system-caution
+            : root.severity == InfoBarSeverity.success ? FluentTheme.system-success
+            : FluentTheme.system-attention;
+
+        FluentIcon {
+            width: 100%;
+            height: 100%;
+            viewbox-width: 16;
+            viewbox-height: 16;
+            stroke: FluentTheme.high-contrast ? FluentTheme.contrast-highlight-text : FluentTheme.text-inverse;
+            stroke-line-cap: round;
+            stroke-line-join: round;
+            commands: root.severity == InfoBarSeverity.error ? "M 5 5 L 11 11 M 11 5 L 5 11"
+                : root.severity == InfoBarSeverity.warning ? "M 8 4 L 8 9 M 8 11.75 L 8 12"
+                : root.severity == InfoBarSeverity.success ? "M 4.25 8 L 7 10.75 L 11.75 5.5"
+                : "M 8 6.75 L 8 11.8 M 8 4 L 8 4.25";
+        }
+    }
+
+    banner := Rectangle {
+        x: root.stroke + FluentMetrics.info-bar-left-padding
+            + (root.icon-visible ? severity-icon.width + FluentMetrics.info-bar-icon-gap : 0px);
+        y: root.stroke;
+        width: max(0px, root.width - self.x - root.stroke - FluentMetrics.info-bar-left-padding - root.close-space);
+        height: max(title-text.y + title-text.height, message-text.y + message-text.height,
+            action.y + action.height) + (self.stacked ? FluentMetrics.info-bar-stacked-bottom : 0px);
+        property <bool> has-title: root.title != "";
+        property <bool> has-message: root.message != "";
+        property <bool> has-action: root.action-text != "";
+        property <length> message-gap: has-title && has-message ? FluentMetrics.info-bar-inline-message-gap : 0px;
+        property <length> action-gap: has-action && (has-title || has-message) ? FluentMetrics.info-bar-left-padding : 0px;
+        property <length> inline-width: (has-title ? title-text.preferred-width : 0px)
+            + (has-message ? message-text.preferred-width : 0px) + message-gap
+            + (has-action ? action.preferred-width : 0px) + action-gap;
+        property <int> count: (has-title ? 1 : 0) + (has-message ? 1 : 0) + (has-action ? 1 : 0);
+        // Horizontal measurement is unconstrained. Vertical measurement uses the
+        // actual text widths and is independent of the final item positions.
+        property <bool> fits-width: count > 1 && inline-width <= self.width;
+        property <bool> stacked: !fits-width
+            || max(title-text.height + FluentMetrics.info-bar-text-top,
+                message-text.height + FluentMetrics.info-bar-text-top,
+                action.height + FluentMetrics.spacing-medium) > FluentMetrics.info-bar-min-height;
+
+        title-text := FluentText {
+            x: 0px;
+            y: banner.has-title ? FluentMetrics.info-bar-text-top : 0px;
+            width: banner.fits-width ? self.preferred-width : banner.width;
+            height: banner.has-title && self.width > 0px ? self.preferred-height : 0px;
+            text: root.title;
+            font-weight: FluentMetrics.strong-weight;
+            wrap: word-wrap;
+            visible: banner.has-title;
+            accessible-role: none;
+        }
+
+        message-text := FluentText {
+            x: banner.stacked ? 0px : (banner.has-title ? title-text.width : 0px) + banner.message-gap;
+            y: !banner.has-message ? 0px
+                : banner.stacked && banner.has-title ? title-text.y + title-text.height + FluentMetrics.info-bar-stacked-message-gap
+                : FluentMetrics.info-bar-text-top;
+            width: banner.fits-width ? self.preferred-width : banner.width;
+            height: banner.has-message && self.width > 0px ? self.preferred-height : 0px;
+            text: root.message;
+            wrap: word-wrap;
+            visible: banner.has-message;
+            accessible-role: none;
+        }
+
+        action := Button {
+            x: banner.stacked ? 0px : banner.inline-width - self.width;
+            y: !banner.has-action ? 0px : !banner.stacked ? FluentMetrics.spacing-medium
+                : banner.has-title || banner.has-message
+                    ? max(title-text.y + title-text.height, message-text.y + message-text.height) + FluentMetrics.info-bar-inline-message-gap
+                    : FluentMetrics.info-bar-text-top;
+            width: min(banner.width, self.preferred-width);
+            height: banner.has-action && self.width > 0px ? self.preferred-height : 0px;
+            text: root.action-text;
+            wrap-text: true;
+            minimum-target: root.minimum-target;
+            visible: banner.has-action;
+            enabled: root.presented && self.visible;
+            clicked => { root.action-clicked(); }
+        }
+    }
+
+    close-button := Button {
+        x: root.width - root.stroke - FluentMetrics.info-bar-close-margin - self.width;
+        y: root.stroke + FluentMetrics.info-bar-close-margin;
+        width: root.close-size;
+        height: self.width;
+        variant: ButtonVariant.subtle;
+        visible: root.closable;
+        enabled: root.presented && self.visible;
+        accessible-label: @tr("Close");
+        clicked => { root.request-close(InfoBarCloseReason.close-button); }
+        FluentIcon {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: FluentMetrics.info-bar-icon-size;
+            height: self.width;
+            viewbox-width: 16;
+            viewbox-height: 16;
+            commands: "M 3 3 L 13 13 M 13 3 L 3 13";
+            stroke-line-cap: round;
+            stroke: close-button.pressed ? FluentTheme.text-secondary : FluentTheme.text-primary;
+        }
+    }
+}

@@ -208,6 +208,7 @@ Cargo workspace 里存放实际可编译 crate；`platforms/` 中哪些目录作
 
 - **参考基准**：本文件第 5 节指定的微软 WinUI 官方源码与官方 WinUI Gallery（一级参考），以及 Microsoft Learn 和项目 `design/specifications/` 中经确认、带来源追踪的规格。
 - **禁止主观猜测**颜色、尺寸和动画参数后宣称“1:1 还原”。不确定时标为 `TODO(spec)`，写清测量与验证方式。
+- **明确排除的控件**：本项目不实现官方 **`TableView`** 和 **`Chart`** 控件，两者均不纳入开发里程碑、Gallery 演示或验收范围。
 - **首批控件（候选范围，不表示实现顺序）**：Button、TextBox、PasswordBox、CheckBox、RadioButton、ToggleSwitch、Slider、ComboBox、NavigationView、ContentDialog、InfoBar、ProgressBar、ProgressRing。**实际顺序严格遵守第 7.1–7.3 节的依赖门槛与第 14 节里程碑。**
 - **各状态必须覆盖**：Normal、PointerOver、Pressed、Focused、Disabled，以及控件特有的 Selected / Checked / Error 等。
 - **主题**：亮色、暗色、强调色、高对比需求；优先复用令牌，不允许在组件内堆叠平台专属颜色分支。

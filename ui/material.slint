@@ -1,9 +1,29 @@
+import { OverlayArea } from "overlay-placement.slint";
 import { FluentSurface } from "primitives.slint";
 import { FluentMetrics, FluentTheme } from "tokens.slint";
 
 export enum FluentMaterial { solid-fallback, mica, acrylic, mica-alt, desktop-acrylic }
 
+export struct AcrylicCapture {
+    bounds: OverlayArea,
+    scrim-bounds: OverlayArea,
+    scrim: color,
+    fallback: color,
+    blur-radius: length,
+    luminosity: color,
+    tint: color,
+    noise-opacity: float,
+}
+
+export global AcrylicBackdrop {
+    callback capture(AcrylicCapture) -> image;
+}
+
 export global FluentMaterials {
+    public pure function in-app-enabled(requested: bool) -> bool {
+        return requested && !FluentTheme.high-contrast && !FluentTheme.reduce-transparency;
+    }
+
     // Always opaque. A host can use this from the first frame through any
     // native backdrop failure or change in the contrast preference.
     pure public function fallback-color(material: FluentMaterial) -> color {

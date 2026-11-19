@@ -1,3 +1,7 @@
+import { InfoBadge } from "../../../ui/info-badge.slint";
+import { NavigationChevron } from "../../../ui/navigation-chevron.slint";
+import { NavigationActionSurface } from "../../../ui/navigation-pane.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
 import { Button, ButtonVariant } from "../../../ui/button.slint";
 import { FluentInAppAcrylic, FluentMaterial } from "../../../ui/material.slint";
 import { FluentElevatedSurface, FluentIcon, FluentText } from "../../../ui/primitives.slint";
@@ -6,7 +10,7 @@ import { Caption } from "caption.slint";
 
 export enum AppearanceAction { toggle-motion, toggle-text-scale, toggle-accent }
 
-export component FoundationsPage inherits Flickable {
+export component FoundationsPage inherits FluentScrollView {
     in property <length> target-size;
     in property <bool> alternate-accent;
     in property <FluentMaterial> backdrop;
@@ -27,12 +31,13 @@ export component FoundationsPage inherits Flickable {
     callback change-appearance(AppearanceAction);
     callback select-backdrop(FluentMaterial);
 
-    content-width: self.width;
     content-height: max(self.height, page.preferred-height);
     mouse-drag-pan-enabled: false;
 
     page := VerticalLayout {
-        width: parent.width;
+        x: 0px;
+        y: 0px;
+        width: root.content-width;
         height: self.preferred-height;
         padding: FluentMetrics.spacing-medium;
         spacing: FluentMetrics.spacing-large;
@@ -81,7 +86,7 @@ export component FoundationsPage inherits Flickable {
                 }
             }
             if root.backdrop != FluentMaterial.solid-fallback : Caption {
-                text: root.native-desktop-acrylic ? "Windows Desktop Acrylic" : "Solid fallback";
+                text: root.native-desktop-acrylic ? "Native Desktop Acrylic" : "Solid fallback";
             }
         }
 
@@ -148,6 +153,43 @@ export component FoundationsPage inherits Flickable {
                 Caption {
                     text: "Caption";
                     font-size: FluentMetrics.caption-size;
+                }
+            }
+        }
+
+        VerticalLayout {
+            spacing: FluentMetrics.spacing-medium;
+            FluentText { text: "InfoBadge"; font-weight: FluentMetrics.strong-weight; }
+            HorizontalLayout {
+                alignment: start;
+                spacing: FluentMetrics.spacing-large;
+                InfoBadge { label: "Unread status"; }
+                InfoBadge { value: 0; }
+                InfoBadge { value: 128; severity: informational; }
+                InfoBadge {
+                    icon: @image-url("../../../ui/icons/fluent/mail-20-regular.svg");
+                    label: "Mail notification";
+                    severity: success;
+                }
+            }
+            FluentText { text: "AnimatedIcon"; font-weight: FluentMetrics.strong-weight; }
+            HorizontalLayout {
+                alignment: start;
+                toggle-animation := NavigationActionSurface {
+                    min-height: FluentMetrics.navigation-item-height;
+                    min-width: FluentMetrics.navigation-icon-slot;
+                    horizontal-stretch: 0;
+                    property <bool> expanded;
+                    label: self.expanded ? "Collapse animation example" : "Expand animation example";
+                    accessible-role: button;
+                    accessible-expanded: self.expanded;
+                    activated => { self.expanded = !self.expanded; }
+                    NavigationChevron {
+                        expanded: toggle-animation.expanded;
+                        hovered: toggle-animation.hovered;
+                        pressed: toggle-animation.pressed;
+                        foreground: toggle-animation.foreground;
+                    }
                 }
             }
         }

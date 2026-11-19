@@ -1,0 +1,122 @@
+import { Button } from "../../../ui/button.slint";
+import { InfoBar, InfoBarCloseReason, InfoBarSeverity } from "../../../ui/info-bar.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentMetrics } from "../../../ui/tokens.slint";
+
+export struct InfoBarSample {
+    bounds: OverlayArea,
+    icon: Point,
+    close: Point,
+    message-height: length,
+    shown: bool,
+    stacked: bool,
+}
+
+component GalleryInfoBar inherits InfoBar {
+    is-open: true;
+    out property <InfoBarSample> sample: {
+        bounds: { x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height },
+        icon: root.icon-center,
+        close: root.close-center,
+        message-height: root.message-height,
+        shown: root.shown,
+        stacked: root.stacked,
+    };
+}
+
+export component InfoBarPage inherits FluentScrollView {
+    in property <length> target-size;
+    in-out property <bool> long-message;
+    in-out property <bool> closable: true;
+    in property <bool> prevent-dismissal;
+    out property <[InfoBarSample]> samples: [information.sample, success.sample, warning.sample, error.sample];
+    out property <int> close-clicks;
+    out property <int> close-attempts;
+    out property <int> closed-count;
+    out property <InfoBarCloseReason> close-reason;
+    out property <bool> info-close-focused: information.close-focused;
+    out property <bool> review-requested;
+
+    public function set-information-open(open: bool) { information.is-open = open; }
+    public function show-all() {
+        information.show();
+        success.show();
+        warning.show();
+        error.show();
+    }
+
+    content-height: max(self.height, examples.preferred-height);
+
+    examples := VerticalLayout {
+        x: 0px;
+        y: 0px;
+        width: root.content-width;
+        height: self.preferred-height;
+        padding: FluentMetrics.focus-outset;
+        spacing: FluentMetrics.spacing-medium;
+
+        FlexboxLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-medium;
+
+            Button {
+                text: "Show all";
+                minimum-target: root.target-size;
+                clicked => { root.show-all(); }
+            }
+            Button {
+                text: root.long-message ? "Short message" : "Long message";
+                minimum-target: root.target-size;
+                clicked => { root.long-message = !root.long-message; }
+            }
+            Button {
+                text: root.closable ? "Hide close buttons" : "Show close buttons";
+                minimum-target: root.target-size;
+                clicked => { root.closable = !root.closable; }
+            }
+        }
+
+        information := GalleryInfoBar {
+            title: "Workspace ready";
+            message: root.long-message
+                ? "Your workspace is ready to use. Changes are saved locally while you work. When the connection returns, pending updates will sync automatically. You can continue editing and review the sync status later."
+                : "Your workspace is ready to use.";
+            closable: root.closable;
+            minimum-target: root.target-size;
+            close-button-clicked => { root.close-clicks += 1; }
+            closing(reason) => {
+                root.close-attempts += 1;
+                return !root.prevent-dismissal;
+            }
+            closed(reason) => {
+                root.close-reason = reason;
+                root.closed-count += 1;
+            }
+        }
+        success := GalleryInfoBar {
+            severity: InfoBarSeverity.success;
+            title: "Changes saved";
+            message: "Your changes are up to date.";
+            closable: root.closable;
+            minimum-target: root.target-size;
+        }
+        warning := GalleryInfoBar {
+            severity: InfoBarSeverity.warning;
+            title: "Storage is almost full";
+            message: root.review-requested ? "Review your saved files to free up space." : "Review files you no longer need.";
+            action-text: "Review";
+            closable: root.closable;
+            minimum-target: root.target-size;
+            action-clicked => { root.review-requested = true; }
+        }
+        error := GalleryInfoBar {
+            severity: InfoBarSeverity.error;
+            title: "Sync failed";
+            message: "Check your connection and try again.";
+            closable: root.closable;
+            minimum-target: root.target-size;
+        }
+    }
+}

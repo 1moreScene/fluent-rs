@@ -1,5 +1,5 @@
 [workspace]
-members = ["apps/gallery"]
+members = ["apps/gallery", "crates/fluent-core", "crates/fluent-materials"]
 resolver = "3"
 
 [workspace.package]

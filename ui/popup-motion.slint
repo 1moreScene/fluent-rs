@@ -1,0 +1,34 @@
+import { FluentMotion } from "motion.slint";
+
+// PopupThemeTransition reads these tracks from the active Windows theme.
+// Hosts may supply the system tracks. Button Flyouts can opt into portable timing.
+export struct PopupMotionTrack {
+    delay: duration,
+    duration: duration,
+    curve: easing,
+}
+
+export struct PopupMotionProfile {
+    enter-translation: PopupMotionTrack,
+    enter-opacity: PopupMotionTrack,
+    exit-opacity: PopupMotionTrack,
+    enter-opacity-from: float,
+    enter-opacity-to: float,
+    exit-opacity-from: float,
+    exit-opacity-to: float,
+}
+
+export global FluentPopupMotion {
+    in property <PopupMotionProfile> profile;
+    out property <bool> has-enter-translation: profile.enter-translation.duration > 0ms;
+    out property <bool> has-enter-opacity: profile.enter-opacity.duration > 0ms;
+    out property <bool> has-exit-opacity: profile.exit-opacity.duration > 0ms;
+    out property <duration> exit-duration: profile.exit-opacity.delay + profile.exit-opacity.duration;
+    out property <bool> has-profile: has-enter-translation || has-enter-opacity || has-exit-opacity;
+    out property <PopupMotionProfile> portable-profile: {
+        enter-translation: { duration: FluentMotion.control-normal-duration, curve: FluentMotion.control-fast-out-slow-in },
+        enter-opacity: { duration: FluentMotion.dropdown-fade, curve: linear },
+        exit-opacity: { duration: FluentMotion.dropdown-fade, curve: linear },
+        enter-opacity-from: 0, enter-opacity-to: 1, exit-opacity-from: 1, exit-opacity-to: 0,
+    };
+}

@@ -1,0 +1,375 @@
+import { ButtonSurface, ButtonVariant } from "button-surface.slint";
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { FluentPressable } from "interaction.slint";
+import { ItemAppearance, ItemData, ItemDecoration } from "item-presenter.slint";
+import { FluentLiveAcrylic } from "live-acrylic.slint";
+import { FluentMaterials } from "material.slint";
+import { TopNavigationLayout } from "navigation-layout.slint";
+import { FluentMotion } from "motion.slint";
+import { OverlayArea, OverlayHost } from "overlay-host.slint";
+import { OverlayLayout } from "overlay-placement.slint";
+import { FluentText } from "primitives.slint";
+import { SelectableList } from "selectable-list.slint";
+import { ListDirection, SelectionLogic } from "selection-model.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export enum CommandBarLabelPosition { bottom, right, collapsed }
+export enum CommandBarClosedMode { compact, minimal, hidden }
+
+export struct CommandBarItem {
+    text: string,
+    icon: image,
+    disabled: bool,
+    toggle: bool,
+    checked: bool,
+    overflow-order: int,
+}
+
+export struct CommandBarLayout {
+    primary: [int],
+    overflow: [int],
+    more: bool,
+}
+
+export struct CommandBarMenu {
+    items: [ItemData],
+    decorations: [ItemDecoration],
+}
+
+export struct CommandBarMeasure {
+    width: length,
+    more-width: length,
+    button-width: length,
+    dynamic: bool,
+    force-more: bool,
+}
+
+export global CommandBarLogic {
+    pure callback arrange([CommandBarItem], [length], int, CommandBarMeasure) -> CommandBarLayout;
+    pure callback menu([CommandBarItem], [CommandBarItem], [int]) -> CommandBarMenu;
+}
+
+component CommandButton inherits FluentPressable {
+    in property <string> label;
+    in property <image> icon;
+    in property <CommandBarLabelPosition> label-position;
+    in property <bool> show-bottom-label;
+    in property <bool> checked;
+    in property <bool> more;
+    property <bool> side: root.label-position == CommandBarLabelPosition.right && !root.more;
+    property <color> foreground: FluentTheme.high-contrast && root.checked
+        ? (!root.enabled ? FluentTheme.contrast-surface : root.hovered || root.pressed ? FluentTheme.contrast-highlight : FluentTheme.contrast-highlight-text)
+        : root.checked ? (!root.enabled ? FluentTheme.accent-text-disabled : root.pressed ? FluentTheme.accent-text-pressed : FluentTheme.accent-text)
+        : !root.enabled ? FluentTheme.text-disabled
+        : FluentTheme.high-contrast && root.pressed ? FluentTheme.contrast-highlight
+        : FluentTheme.high-contrast && root.hovered ? FluentTheme.contrast-highlight-text
+        : root.pressed ? FluentTheme.text-secondary : FluentTheme.text-primary;
+    focus-on-press: true;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if (root.enabled) { root.activated(); } }
+
+    ButtonSurface {
+        x: FluentMetrics.spacing-small / 2;
+        y: min(FluentMetrics.command-end-inset, root.height / 6);
+        width: max(0px, parent.width - self.x - (root.more ? FluentMetrics.command-end-inset : self.x));
+        height: max(0px, parent.height - 2 * self.y);
+        variant: root.checked ? ButtonVariant.accent : ButtonVariant.subtle;
+        contrast-fill: root.checked && (root.hovered || root.pressed)
+            ? FluentTheme.contrast-highlight-text : !root.enabled ? FluentTheme.contrast-surface
+            : root.pressed ? FluentTheme.contrast-highlight-text : root.checked || root.hovered ? FluentTheme.contrast-highlight : FluentTheme.contrast-surface;
+        state: root.state;
+        focus-visible: root.focus-visible;
+    }
+    FluentSystemIcon {
+        width: FluentMetrics.command-icon-size;
+        x: root.side ? FluentMetrics.button-padding-horizontal : (parent.width - self.width) / 2;
+        y: root.show-bottom-label ? FluentMetrics.spacing-large : (parent.height - self.height) / 2;
+        source: root.icon;
+        foreground: root.foreground;
+    }
+    if root.side || root.show-bottom-label : FluentText {
+        x: root.side ? FluentMetrics.button-padding-horizontal + (root.icon.width > 0 ? FluentMetrics.command-icon-size + FluentMetrics.spacing-medium : 0px) : FluentMetrics.spacing-small;
+        y: root.side ? 0px : parent.height - FluentMetrics.command-label-bottom - self.height;
+        width: max(0px, parent.width - self.x - (root.side ? FluentMetrics.button-padding-horizontal : FluentMetrics.spacing-small));
+        height: root.side ? parent.height : self.preferred-height;
+        text: root.label;
+        font-size: FluentMetrics.command-label-size;
+        color: root.foreground;
+        overflow: elide;
+        horizontal-alignment: root.side ? left : center;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+}
+
+export component CommandBar inherits FocusScope {
+    slot content;
+    in property <[CommandBarItem]> primary;
+    in property <[CommandBarItem]> secondary;
+    in property <OverlayArea> viewport;
+    in property <CommandBarLabelPosition> label-position;
+    in property <CommandBarClosedMode> closed-mode;
+    in property <bool> dynamic-overflow: true;
+    in property <bool> active: true;
+    in property <length> reserved-content-width;
+    in property <length> minimum-target;
+    out property <bool> open: (popup.open && !popup.closing) || root.expanded-alone;
+    out property <bool> more-focused: more.has-focus;
+    out property <Point> more-center: { x: more.absolute-position.x + more.width / 2, y: more.absolute-position.y + more.height / 2 };
+    out property <OverlayArea> overflow-bounds: popup.panel-bounds;
+    out property <length> overflow-row-height: root.row-height;
+    out property <length> overflow-scroll-offset;
+    out property <OverlayArea> visible-bar-bounds: {
+        x: root.bar-bounds.x, y: root.bar-bounds.y + root.bar-y, width: root.width, height: root.bar-height,
+    };
+    out property <length> layout-height: root.open-above ? root.closed-height : root.bar-height;
+    out property <[int]> primary-indices: root.layout.primary;
+    out property <[int]> overflow-indices: root.layout.overflow;
+    out property <int> focused-overflow-row: root.open ? root.overflow-focus : -1;
+    callback invoked(int, bool);
+
+    property <[length]> measured;
+    property <[int]> entries: TopNavigationLayout.indices(0, root.primary.length);
+    property <CommandBarLayout> layout: CommandBarLogic.arrange(root.primary, root.label-position == CommandBarLabelPosition.right ? root.measured : [], root.secondary.length, {
+        width: max(0px, root.width - root.reserved-content-width), more-width: root.more-width,
+        button-width: max(root.minimum-target, FluentMetrics.command-button-width), dynamic: root.dynamic-overflow,
+        force-more: root.primary.length > 0 && (root.label-position == CommandBarLabelPosition.bottom || root.closed-mode != CommandBarClosedMode.compact),
+    });
+    property <CommandBarMenu> menu: CommandBarLogic.menu(root.primary, root.secondary, root.layout.overflow);
+    property <CommandBarMenu> primary-menu: CommandBarLogic.menu(root.primary, [], root.layout.primary);
+    property <length> more-width: max(root.minimum-target, FluentMetrics.command-more-width);
+    property <length> expanded-height: max(root.minimum-target, FluentMetrics.command-open-height);
+    property <length> closed-height: root.closed-mode == CommandBarClosedMode.hidden ? 0px
+        : max(root.minimum-target, root.closed-mode == CommandBarClosedMode.minimal ? FluentMetrics.command-minimal-height : FluentMetrics.command-compact-height);
+    property <length> bar-height: root.open ? root.expanded-height : root.closed-height;
+    property <bool> open-above;
+    property <bool> popup-visible: popup.open;
+    property <length> bar-y: root.open-above ? root.closed-height - root.bar-height : 0px;
+    property <bool> show-primary: root.open || root.closed-mode == CommandBarClosedMode.compact;
+    property <bool> expanded-alone;
+    property <int> focused-command: -1;
+    property <int> focus-request: -1;
+    property <int> overflow-focus: -1;
+    property <bool> touch: root.minimum-target > 0px;
+    property <bool> full-width: root.viewport.width <= FluentMetrics.command-overflow-max;
+    property <bool> icons-in-menu: root.menu.decorations.length > 0 && root.menu.decorations[0].icon-space;
+    property <bool> checks-in-menu: root.menu.decorations.length > 0 && root.menu.decorations[0].command-check-space;
+    property <length> label-offset: root.icons-in-menu && root.checks-in-menu ? FluentMetrics.command-overflow-two-column-label
+        : root.icons-in-menu || root.checks-in-menu ? FluentMetrics.command-overflow-one-column-label : FluentMetrics.command-overflow-inset;
+    property <length> menu-min-width: root.touch ? FluentMetrics.command-overflow-touch-min : FluentMetrics.command-overflow-min;
+    property <length> menu-width: root.full-width ? root.viewport.width : clamp(
+        overflow-labels.preferred-width + root.label-offset + FluentMetrics.command-overflow-inset + 2 * root.menu-border,
+        root.menu-min-width, FluentMetrics.command-overflow-max);
+    property <int> separator-row: root.layout.overflow.length > 0 && root.layout.overflow[0] < root.primary.length
+        ? TopNavigationLayout.position(root.layout.overflow, root.primary.length) : -1;
+    property <length> row-height: max(root.minimum-target, row-measure.preferred-height + (root.touch
+        ? FluentMetrics.command-overflow-touch-row-top + FluentMetrics.command-overflow-touch-row-bottom
+        : FluentMetrics.command-overflow-row-top + FluentMetrics.command-overflow-row-bottom));
+    property <length> menu-border: root.full-width ? 0px : FluentMetrics.control-stroke;
+    property <length> list-top: root.full-width && root.open-above ? FluentMetrics.control-stroke : root.menu-border;
+    property <length> list-bottom: root.full-width && !root.open-above ? FluentMetrics.control-stroke : root.menu-border;
+    property <length> menu-height: root.menu.items.length * root.row-height + 2 * FluentMetrics.command-overflow-content-margin
+        + (root.full-width ? FluentMetrics.control-stroke : 2 * root.menu-border)
+        + (root.separator-row >= 0 ? FluentMetrics.command-overflow-separator : 0px);
+    property <OverlayArea> bar-bounds: {
+        x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.expanded-height,
+    };
+
+    height: root.bar-height;
+    preferred-height: root.layout-height;
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+    accessible-role: groupbox;
+    accessible-label: "Commands";
+
+    animate bar-height {
+        enabled: FluentMotion.enabled && root.active;
+        duration: root.open ? FluentMotion.control-normal-duration : FluentMotion.control-fast-duration;
+        easing: FluentMotion.control-fast-out-slow-in;
+    }
+
+    public function show() {
+        if (root.enabled && root.active && root.layout.more && !root.open) {
+            more.focus();
+            if (root.menu.items.length > 0) {
+                root.open-above = popup.panel-bounds.y < root.absolute-position.y;
+                popup.show();
+            }
+            else { root.expanded-alone = true; }
+        }
+    }
+
+    public function dismiss() {
+        root.expanded-alone = false;
+        popup.dismiss-with-transition();
+    }
+
+    changed active => { if (!root.active) { root.expanded-alone = false; popup.dismiss(); } }
+    changed popup-visible => {
+        if (!root.popup-visible) {
+            root.open-above = false;
+            root.overflow-scroll-offset = 0px;
+        }
+    }
+    changed overflow-indices => { if (popup.open) { popup.dismiss(); } }
+
+    key-pressed(event) => {
+        if (event.text == Key.Escape && root.open) {
+            root.dismiss();
+            return accept;
+        }
+        if (event.text == Key.DownArrow && more.has-focus) {
+            root.show();
+            return accept;
+        }
+        if (event.text == Key.LeftArrow || event.text == Key.RightArrow) {
+            let current = more.has-focus ? root.layout.primary.length : TopNavigationLayout.position(root.layout.primary, root.focused-command);
+            let backwards = event.text == Key.LeftArrow;
+            let index = SelectionLogic.target(root.primary-menu.items, current, backwards ? ListDirection.previous : ListDirection.next);
+            if (index >= 0) { root.focus-request = root.layout.primary[index]; }
+            else if (!backwards && more.visible) { more.focus(); }
+            return accept;
+        }
+        return reject;
+    }
+
+    for command[index] in (root.label-position == CommandBarLabelPosition.right && root.active ? root.primary : []) : FluentText {
+        text: command.text;
+        font-size: FluentMetrics.command-label-size;
+        visible: false;
+        accessible-role: none;
+        property <length> command-width: max(FluentMetrics.command-button-width,
+            self.preferred-width + 2 * FluentMetrics.button-padding-horizontal + (command.icon.width > 0 ? FluentMetrics.command-icon-size + FluentMetrics.spacing-medium : 0px));
+        init => { root.measured = TopNavigationLayout.measure(root.measured, index, self.command-width); }
+        changed command-width => { root.measured = TopNavigationLayout.measure(root.measured, index, self.command-width); }
+    }
+
+    row-measure := FluentText {
+        visible: false;
+        text: "Mg";
+        accessible-role: none;
+    }
+    overflow-labels := VerticalLayout {
+        visible: false;
+        for item in (root.active && !root.full-width ? root.menu.items : []) : FluentText {
+            text: item.text;
+            accessible-role: none;
+        }
+    }
+
+    Rectangle {
+        property <bool> open-surface: root.open || popup.closing;
+        property <bool> acrylic: FluentMaterials.in-app-enabled(self.open-surface);
+        y: root.bar-y;
+        width: 100%;
+        height: 100%;
+        border-radius: FluentMetrics.control-radius;
+        background: !self.open-surface || self.acrylic ? transparent : FluentTheme.acrylic-fallback;
+        if self.acrylic : FluentLiveAcrylic { width: 100%; height: 100%; border-radius: FluentMetrics.control-radius; }
+        if self.open-surface && !FluentTheme.high-contrast : Rectangle {
+            width: 100%;
+            height: 100%;
+            border-radius: FluentMetrics.control-radius;
+            border-width: FluentMetrics.control-stroke;
+            border-color: FluentTheme.command-bar-open-stroke;
+        }
+    }
+
+    Rectangle {
+        y: root.bar-y;
+        width: 100%;
+        height: 100%;
+        clip: true;
+        HorizontalLayout {
+            width: 100%;
+            height: 100%;
+            alignment: end;
+
+            content-slot := Rectangle {
+                horizontal-stretch: 1;
+                visible: root.show-primary;
+                clip: true;
+                content { }
+            }
+            for index in root.entries : CommandButton {
+                property <CommandBarItem> command: root.primary[index];
+                visible: root.show-primary && SelectionLogic.contains(root.layout.primary, index);
+                width: self.visible ? max(root.minimum-target,
+                    root.label-position == CommandBarLabelPosition.right && index < root.measured.length ? root.measured[index] : FluentMetrics.command-button-width) : 0px;
+                height: 100%;
+                label: self.command.text;
+                icon: self.command.icon;
+                checked: self.command.toggle && self.command.checked;
+                label-position: root.label-position;
+                show-bottom-label: root.open && root.label-position == CommandBarLabelPosition.bottom;
+                enabled: root.active && root.enabled && self.visible && !self.command.disabled;
+                accessible-checkable: self.command.toggle;
+                accessible-checked: self.checked;
+                property <bool> requested: root.focus-request == index;
+                changed requested => { if (self.requested && self.enabled) { self.focus(); root.focus-request = -1; } }
+                focus-changed-event => { if (self.has-focus) { root.focused-command = index; } }
+                activated => { root.dismiss(); root.invoked(index, false); }
+            }
+            more := CommandButton {
+                more: true;
+                width: self.visible ? min(root.width, root.more-width) : 0px;
+                height: 100%;
+                visible: root.layout.more && (root.open || root.closed-mode != CommandBarClosedMode.hidden);
+                enabled: root.active && root.enabled && self.visible;
+                label: "More commands";
+                icon: @image-url("icons/fluent/more-horizontal-20-regular.svg");
+                accessible-expanded: root.open;
+                activated => { if (root.open) { root.dismiss(); } else { root.show(); } }
+            }
+        }
+    }
+
+    popup := OverlayHost {
+        active: root.active && root.enabled && root.menu.items.length > 0;
+        area: root.viewport;
+        anchor: { x: root.bar-bounds.x, y: root.bar-bounds.y };
+        anchor-height: root.expanded-height;
+        use-positioned-panel: true;
+        positioned-panel: OverlayLayout.command-overflow(root.viewport, root.bar-bounds, root.closed-height, root.menu-width, root.menu-height);
+        acrylic: true;
+        live-acrylic: true;
+        edge-reveal: true;
+        surface-stroke: FluentTheme.command-overflow-stroke;
+        edge-reveal-offset: root.open-above ? root.expanded-height - root.bar-height : root.bar-height - root.expanded-height;
+        surface-border-width: root.menu-border;
+        far-edge-stroke: root.full-width;
+        focus-scope-on-open: false;
+
+        SelectableList {
+            x: root.menu-border;
+            y: root.list-top;
+            width: max(0px, popup.panel-bounds.width - 2 * self.x);
+            height: max(0px, popup.panel-bounds.height - self.y - root.list-bottom);
+            framed: false;
+            item-appearance: ItemAppearance.command-overflow;
+            row-height: root.row-height;
+            content-margin-y: FluentMetrics.command-overflow-content-margin;
+            separator-before-row: root.separator-row;
+            items: root.menu.items;
+            decorations: root.menu.decorations;
+            label: "More commands";
+            minimum-target: root.minimum-target;
+            wrap-navigation: true;
+            focus-on-init: true;
+            changed scroll-offset => { root.overflow-scroll-offset = self.scroll-offset; }
+            focus-row-changed(row) => { root.overflow-focus = row; }
+            row-key-action(row, key) => {
+                if (key == Key.Tab || key == Key.Backtab) { root.dismiss(); }
+                return false;
+            }
+            row-activated(row, from, control, shift, keyboard) => {
+                let source = root.layout.overflow[row];
+                root.dismiss();
+                if (source >= root.primary.length) { root.invoked(source - root.primary.length, true); }
+                else { root.invoked(source, false); }
+            }
+        }
+    }
+}

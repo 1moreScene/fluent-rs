@@ -1,0 +1,8 @@
+export struct ComboTextMatch { index: int, prefix-bytes: int, item-bytes: int }
+
+import { ItemData } from "item-presenter.slint";
+
+export global ComboTextSearch {
+    pure callback find([ItemData], string, int, bool) -> ComboTextMatch;
+    pure callback contains-text(string) -> bool;
+}

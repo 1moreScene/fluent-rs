@@ -1,0 +1,86 @@
+import { Button } from "../../../ui/button.slint";
+import { ButtonState } from "../../../ui/interaction.slint";
+import { RepeatButton, RepeatButtonSurface, ButtonClickMode } from "../../../ui/repeat-button.slint";
+import { OverlayArea } from "../../../ui/overlay-placement.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+export struct RepeatButtonProbe {
+    bounds: OverlayArea, focused: bool, focus-visible: bool, state: ButtonState,
+    repeating: bool, timing-valid: bool,
+}
+
+export component RepeatButtonPage inherits FluentScrollView {
+    mouse-drag-pan-enabled: false;
+    in property <bool> active;
+    in property <length> target-size;
+    in-out property <bool> button-enabled: true;
+    in-out property <ButtonClickMode> click-mode: ButtonClickMode.press;
+    in-out property <duration> delay: FluentMetrics.repeat-button-delay;
+    in-out property <duration> interval: FluentMetrics.repeat-button-interval;
+    in-out property <bool> disable-on-click;
+    out property <int> clicks;
+    callback activated;
+    out property <RepeatButtonProbe> probe: {
+        bounds: { x: hold.absolute-position.x, y: hold.absolute-position.y, width: hold.width, height: hold.height },
+        focused: hold.has-focus, focus-visible: hold.focus-visible, state: hold.state,
+        repeating: hold.repeating, timing-valid: hold.timing-valid,
+    };
+    public function focus-button() { hold.focus(); }
+    public function leave-button() { following.focus(); }
+    content-height: max(root.height, content.preferred-height);
+    content := VerticalLayout {
+        x: 0px; y: 0px;
+        width: root.content-width;
+        height: self.preferred-height;
+        padding: FluentMetrics.spacing-medium;
+        spacing: FluentMetrics.spacing-large;
+        FluentText { text: "Press and hold to repeat an action."; wrap: word-wrap; }
+        HorizontalLayout {
+          alignment: start;
+          hold := RepeatButton {
+            text: "Click and hold";
+            enabled: root.button-enabled;
+            active: root.active;
+            minimum-target: root.target-size;
+            click-mode: root.click-mode;
+            delay: root.delay;
+            interval: root.interval;
+            clicked => { root.clicks += 1; root.activated(); if (root.disable-on-click) { root.button-enabled = false; } }
+          }
+        }
+        FluentText { text: "Number of clicks: " + root.clicks; wrap: word-wrap; }
+        following := Button {
+            text: root.button-enabled ? "Disable RepeatButton" : "Enable RepeatButton";
+            minimum-target: root.target-size;
+            clicked => { root.button-enabled = !root.button-enabled; }
+        }
+        FlexboxLayout {
+            spacing: FluentMetrics.spacing-medium;
+            alignment: start;
+            for option in [
+                { text: "Press", mode: ButtonClickMode.press },
+                { text: "Release", mode: ButtonClickMode.release },
+                { text: "Hover", mode: ButtonClickMode.hover },
+            ] : Button { text: option.text; minimum-target: root.target-size; clicked => { root.click-mode = option.mode; } }
+            Button {
+                text: "Toggle repeat speed";
+                minimum-target: root.target-size;
+                clicked => { root.interval = root.interval == FluentMetrics.repeat-button-interval ? 100ms : FluentMetrics.repeat-button-interval; }
+            }
+        }
+        FluentText { text: "RepeatButton states"; font-weight: FluentMetrics.strong-weight; }
+        for item in [
+            { title: "Normal", state: ButtonState.normal, focused: false },
+            { title: "Pointer over", state: ButtonState.pointer-over, focused: false },
+            { title: "Pressed", state: ButtonState.pressed, focused: false },
+            { title: "Keyboard focus", state: ButtonState.normal, focused: true },
+            { title: "Disabled", state: ButtonState.disabled, focused: false },
+        ] : HorizontalLayout {
+            spacing: FluentMetrics.spacing-large;
+            FluentText { text: item.title; min-width: 100px * FluentTheme.ui-scale; wrap: word-wrap; }
+            RepeatButtonSurface { text: "Click and hold"; state: item.state; focus-visible: item.focused; minimum-target: root.target-size; }
+        }
+    }
+}

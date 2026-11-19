@@ -1,0 +1,176 @@
+import { ButtonState, FluentPointerArea, FluentPressable } from "interaction.slint";
+import { FluentMotion } from "motion.slint";
+import { NavigationChevron } from "navigation-chevron.slint";
+import { FluentFocusRing, FluentSurface, FluentText } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export enum ExpandDirection { down, up }
+
+export component Expander inherits Rectangle {
+    slot header-content;
+    in property <string> header;
+    in property <string> accessible-name: root.header;
+    in property <bool> enabled: true;
+    in property <bool> active: true;
+    in property <ExpandDirection> expand-direction;
+    in property <length> content-padding: FluentMetrics.spacing-large;
+    in-out property <bool> expanded;
+    out property <bool> header-focused: toggle.has-focus;
+    out property <ButtonState> header-state: toggle.state;
+    out property <Point> header-center: {
+        x: toggle.absolute-position.x + toggle.width / 2,
+        y: toggle.absolute-position.y + toggle.height / 2,
+    };
+    out property <Point> chevron-center: {
+        x: chevron.absolute-position.x + chevron.width / 2,
+        y: chevron.absolute-position.y + chevron.height / 2,
+    };
+    out property <length> revealed-height: root.content-height * root.progress;
+    callback expanding;
+    callback collapsed;
+
+    property <bool> up: root.expand-direction == ExpandDirection.up;
+    property <length> header-height: max(FluentMetrics.expander-min-height, header-layout.preferred-height);
+    property <length> stroke: FluentMetrics.control-stroke;
+    property <length> header-stroke: FluentTheme.high-contrast ? 2 * root.stroke : root.stroke;
+    property <length> header-left: FluentMetrics.spacing-large + root.header-stroke;
+    property <length> header-right: FluentMetrics.spacing-medium + root.header-stroke;
+    property <length> chevron-column: FluentMetrics.expander-chevron-gap + FluentMetrics.expander-chevron-size + root.header-right;
+    property <length> content-height: max(FluentMetrics.expander-min-height, body-layout.preferred-height + root.stroke);
+    property <float> progress: root.expanded ? 1 : 0;
+    property <color> header-ink: !toggle.enabled ? FluentTheme.text-disabled
+        : FluentTheme.high-contrast && (toggle.hovered || toggle.pressed) ? FluentTheme.contrast-highlight
+        : FluentTheme.text-primary;
+
+    min-width: FluentMetrics.flyout-min-width;
+    preferred-width: max(self.min-width, root.header-left + header-layout.preferred-width + root.chevron-column,
+        body-layout.preferred-width + 2 * root.stroke);
+    min-height: root.header-height + root.revealed-height;
+    preferred-height: self.min-height;
+    vertical-stretch: 0;
+
+    changed expanded => {
+        if (root.expanded) { root.expanding(); }
+        else { root.collapsed(); }
+    }
+
+    animate progress {
+        enabled: root.active && FluentMotion.enabled;
+        duration: root.expanded ? FluentMotion.expander-open-duration : FluentMotion.control-fast-duration;
+        easing: root.expanded ? FluentMotion.control-fast-out-slow-in : FluentMotion.expander-close-easing;
+    }
+
+    toggle := FluentPressable {
+        x: 0px;
+        y: root.up ? root.revealed-height : 0px;
+        width: root.width;
+        height: root.header-height;
+        enabled: root.enabled && root.active;
+        focus-on-press: true;
+        accessible-role: button;
+        accessible-label: root.accessible-name;
+        accessible-enabled: self.enabled;
+        accessible-expandable: true;
+        accessible-expanded: root.expanded;
+        accessible-action-default => { if (self.enabled) { self.activated(); } }
+        accessible-action-expand => { if (self.enabled) { root.expanded = true; } }
+        activated => { root.expanded = !root.expanded; }
+
+        FluentSurface {
+            width: 100%;
+            height: 100%;
+            border-width: root.header-stroke;
+            border-color: FluentTheme.high-contrast ? root.header-ink : FluentTheme.card-stroke;
+            border-top-left-radius: root.up && root.expanded ? 0px : self.border-radius;
+            border-top-right-radius: self.border-top-left-radius;
+            border-bottom-left-radius: !root.up && root.expanded ? 0px : self.border-radius;
+            border-bottom-right-radius: self.border-bottom-left-radius;
+        }
+
+        header-layout := VerticalLayout {
+            x: root.header-left;
+            y: 0px;
+            width: max(0px, parent.width - self.x - root.chevron-column);
+            height: parent.height;
+            alignment: center;
+
+            HorizontalLayout {
+                if root.header != "" : FluentText {
+                    text: root.header;
+                    color: root.header-ink;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
+                    accessible-role: none;
+                }
+                header-content { }
+            }
+        }
+
+        Rectangle {
+            width: FluentMetrics.expander-chevron-size;
+            height: self.width;
+            x: parent.width - root.header-right - self.width;
+            y: (parent.height - self.height) / 2;
+            border-width: FluentTheme.high-contrast ? root.header-stroke : 0px;
+            border-color: root.header-ink;
+            border-radius: FluentMetrics.control-radius;
+            background: FluentTheme.high-contrast || !toggle.enabled ? transparent
+                : toggle.pressed ? FluentTheme.subtle-fill-pressed
+                : toggle.hovered ? FluentTheme.subtle-fill-hover : transparent;
+            chevron := NavigationChevron {
+                width: FluentMetrics.small-chevron-size;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                expanded: root.up ? !root.expanded : root.expanded;
+                hovered: toggle.hovered && toggle.enabled;
+                pressed: toggle.pressed;
+                foreground: root.header-ink;
+            }
+        }
+
+        if toggle.focus-visible : FluentFocusRing {
+            width: 100%;
+            height: 100%;
+        }
+    }
+
+    if root.revealed-height > 0px : Rectangle {
+        y: root.up ? 0px : root.header-height;
+        width: root.width;
+        height: root.revealed-height;
+        clip: true;
+
+        // Put the unused seam stroke beyond the clip so the header owns the shared edge.
+        FluentSurface {
+            y: root.up ? 0px : parent.height - root.content-height - root.stroke;
+            width: 100%;
+            height: root.content-height + root.stroke;
+            background: FluentTheme.card-fill-secondary;
+            border-top-left-radius: root.up ? self.border-radius : 0px;
+            border-top-right-radius: self.border-top-left-radius;
+            border-bottom-left-radius: root.up ? 0px : self.border-radius;
+            border-bottom-right-radius: self.border-bottom-left-radius;
+        }
+    }
+
+    // Keep content instances alive on collapse, along with their layout measurement.
+    body-clip := Rectangle {
+        y: root.up ? 0px : root.header-height;
+        width: root.width;
+        height: root.revealed-height;
+        visible: self.height > 0px;
+        clip: true;
+
+        body-layout := VerticalLayout {
+            y: root.up ? root.stroke : root.revealed-height - root.content-height;
+            x: root.stroke;
+            width: max(0px, parent.width - 2 * self.x);
+            height: root.content-height - root.stroke;
+            padding: root.content-padding;
+            alignment: start;
+            @children
+        }
+
+        if !root.enabled || !root.expanded : FluentPointerArea {}
+    }
+}

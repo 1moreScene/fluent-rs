@@ -1,45 +1,94 @@
+// Slint reports programmatic focus separately from the input that requested it.
+export global FluentFocus {
+    in-out property <bool> keyboard-input;
+}
+
+export component FluentFocusScope inherits FocusScope {
+    out property <bool> focus-visible: self.enabled && self.has-focus && keyboard-focus;
+    property <bool> keyboard-focus;
+    callback focus-left;
+
+    focus-gained(reason) => {
+        if (reason == FocusReason.tab-navigation) { root.use-keyboard-focus(); }
+        else if (reason == FocusReason.pointer-click) { root.use-pointer-focus(); }
+        else if (reason == FocusReason.programmatic) { root.keyboard-focus = FluentFocus.keyboard-input; }
+        else if (reason == FocusReason.popup-activation && !FluentFocus.keyboard-input) {
+            root.keyboard-focus = false;
+        }
+    }
+    focus-lost(reason) => {
+        if (reason != FocusReason.window-activation && reason != FocusReason.popup-activation) {
+            root.keyboard-focus = false;
+        }
+        root.focus-left();
+    }
+
+    public function use-keyboard-focus() {
+        FluentFocus.keyboard-input = true;
+        root.keyboard-focus = true;
+    }
+
+    public function use-pointer-focus() {
+        FluentFocus.keyboard-input = false;
+        root.keyboard-focus = false;
+    }
+}
+
 // While captured, TouchArea continues to receive moves outside its hit area.
 export component FluentPointerArea inherits TouchArea {
     out property <bool> pointer-inside: self.enabled && self.has-hover
         && self.mouse-x >= 0px && self.mouse-x < self.width
         && self.mouse-y >= 0px && self.mouse-y < self.height;
     out property <bool> pressed-inside: self.pressed && self.pointer-inside;
+    callback interaction-event(PointerEvent);
+    pointer-event(event) => {
+        if (event.kind == PointerEventKind.down) { FluentFocus.keyboard-input = false; }
+        root.interaction-event(event);
+    }
 }
 
 export enum ButtonState { normal, pointer-over, pressed, disabled }
+export enum ButtonClickMode { release, press, hover }
 
-export component FluentPressable inherits FocusScope {
+export component FluentPressable inherits FluentFocusScope {
     in property <bool> accepts-enter: true;
+    in property <bool> accepts-pointer: true;
+    in property <ButtonClickMode> click-mode;
+    in property <MouseCursor> pointer-cursor: MouseCursor.default;
+    in property <bool> pointer-activation-enabled: true;
     in property <bool> focus-on-press;
     out property <bool> hovered: pointer.pointer-inside;
-    out property <bool> pressed: self.enabled && (active-key != "" || pointer.pressed-inside);
-    out property <bool> focus-visible: self.enabled && self.has-focus && keyboard-focus;
+    out property <string> pressed-key: active-key;
+    out property <bool> pointer-held: pointer.pressed;
+    out property <bool> pressed: self.enabled && (active-key != "" || pointer.pressed-inside
+        || (root.click-mode == ButtonClickMode.hover && root.hovered));
     out property <ButtonState> state: !self.enabled ? ButtonState.disabled
         : self.pressed ? ButtonState.pressed
         : self.hovered ? ButtonState.pointer-over : ButtonState.normal;
     callback activated;
+    callback pointer-interaction(PointerEvent, Point);
+    callback secondary-clicked(Point);
+    property <bool> secondary-pressed;
+    callback scrolled(PointerScrollEvent) -> EventResult;
+    scrolled(event) => { return reject; }
 
     property <string> active-key;
-    property <bool> keyboard-focus;
-
-    focus-gained(reason) => {
-        if (reason != FocusReason.window-activation) {
-            root.keyboard-focus = reason != FocusReason.pointer-click;
-        }
+    public function cancel-press() { root.active-key = ""; }
+    changed hovered => {
+        if (root.enabled && root.hovered && root.click-mode == ButtonClickMode.hover) { root.activated(); }
     }
-    focus-lost(reason) => {
-        root.active-key = "";
-        if (reason != FocusReason.window-activation) { root.keyboard-focus = false; }
-    }
+    focus-left => { root.active-key = ""; }
     changed enabled => {
-        if (!root.enabled) { root.active-key = ""; }
+        if (!root.enabled) { root.active-key = ""; root.secondary-pressed = false; }
     }
 
     key-pressed(event) => {
-        if (root.enabled && (event.text == " " || (root.accepts-enter && event.text == Key.Return))) {
-            root.keyboard-focus = true;
+        if (root.enabled && root.click-mode != ButtonClickMode.hover
+            && (event.text == " " || (root.accepts-enter && event.text == Key.Return))) {
+            root.use-keyboard-focus();
             if (root.active-key == "" && !event.repeat && !pointer.pressed) {
                 root.active-key = event.text;
+                if (root.click-mode == ButtonClickMode.press) { root.activated(); }
             }
             return accept;
         }
@@ -48,7 +97,7 @@ export component FluentPressable inherits FocusScope {
     key-released(event) => {
         if (root.active-key != "" && event.text == root.active-key) {
             root.active-key = "";
-            if (root.enabled && !pointer.pressed) { root.activated(); }
+            if (root.enabled && !pointer.pressed && root.click-mode == ButtonClickMode.release) { root.activated(); }
             return accept;
         }
         return reject;
@@ -59,13 +108,36 @@ export component FluentPressable inherits FocusScope {
     pointer := FluentPointerArea {
         width: 100%;
         height: 100%;
-        enabled: root.enabled;
-        pointer-event(event) => {
-            if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
-                if (root.focus-on-press) { root.focus(); }
-                root.keyboard-focus = false;
+        enabled: root.enabled && root.accepts-pointer;
+        mouse-cursor: root.pointer-cursor;
+        interaction-event(event) => {
+            if (event.kind == PointerEventKind.cancel) { root.secondary-pressed = false; }
+            if (event.button == PointerEventButton.right) {
+                if (event.kind == PointerEventKind.down) {
+                    root.use-pointer-focus();
+                    root.secondary-pressed = true;
+                }
+                if (event.kind == PointerEventKind.up) {
+                    let activate = root.secondary-pressed && pointer.pointer-inside;
+                    root.secondary-pressed = false;
+                    if (activate) {
+                        root.secondary-clicked({ x: pointer.absolute-position.x + pointer.mouse-x,
+                            y: pointer.absolute-position.y + pointer.mouse-y });
+                    }
+                }
             }
+            if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                root.use-pointer-focus();
+                if (root.focus-on-press) { root.focus(); }
+                if (root.pointer-activation-enabled && root.click-mode == ButtonClickMode.press
+                    && root.active-key == "") { root.activated(); }
+            }
+            root.pointer-interaction(event, { x: pointer.mouse-x, y: pointer.mouse-y });
         }
-        clicked => { if (root.enabled && root.active-key == "") { root.activated(); } }
+        scroll-event(event) => { return root.scrolled(event); }
+        clicked => {
+            if (root.enabled && root.pointer-activation-enabled && root.active-key == ""
+                && root.click-mode == ButtonClickMode.release) { root.activated(); }
+        }
     }
 }

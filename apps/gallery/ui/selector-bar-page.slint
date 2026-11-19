@@ -1,0 +1,83 @@
+import { Button } from "../../../ui/button.slint";
+import { PageHost } from "../../../ui/page-host.slint";
+import { FluentSurface, FluentText } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { SelectorBar } from "../../../ui/selector-bar.slint";
+import { FluentMetrics } from "../../../ui/tokens.slint";
+
+export struct SelectorBarProbe {
+    bar-start: Point,
+    bar-end: Point,
+    bar-bottom: length,
+    selected: int,
+    focused: int,
+    offset: length,
+    clear-focused: bool,
+}
+
+export component SelectorBarPage inherits PageHost {
+    in property <bool> active;
+    in property <length> target-size;
+    out property <SelectorBarProbe> probe: {
+        bar-start: { x: bar.absolute-position.x, y: bar.absolute-position.y + bar.height / 2 },
+        bar-end: { x: bar.absolute-position.x + bar.width, y: bar.absolute-position.y + bar.height / 2 },
+        bar-bottom: bar.absolute-position.y + bar.height,
+        selected: bar.selected-index, focused: bar.focused-index, offset: bar.scroll-offset,
+        clear-focused: clear.has-focus,
+    };
+
+    public function focus-clear() { clear.focus(); }
+    public function select-item(index: int) { bar.set-selected-index(index); }
+
+    FluentScrollView {
+        width: 100%;
+        height: 100%;
+        content-height: max(self.height, examples.preferred-height);
+        mouse-drag-pan-enabled: false;
+
+        examples := VerticalLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-medium;
+            padding: FluentMetrics.focus-outset;
+
+            bar := SelectorBar {
+                width: min(self.preferred-width, max(0px, examples.width - 2 * examples.padding));
+                label: "File views";
+                items: [
+                    { text: "Recent" }, { text: "Shared" }, { text: "Offline", disabled: true },
+                    { text: "Favorites" }, { text: "Archived" },
+                ];
+                icons: [
+                    @image-url("../../../ui/icons/fluent/document-20-regular.svg"),
+                    @image-url("../../../ui/icons/fluent/share-20-regular.svg"),
+                    @image-url(""),
+                    @image-url("../../../ui/icons/fluent/folder-20-regular.svg"),
+                    @image-url("../../../ui/icons/fluent/archive-20-regular.svg"),
+                ];
+                active: root.active;
+                minimum-target: root.target-size;
+            }
+
+            FluentSurface {
+                height: message.preferred-height + 2 * FluentMetrics.spacing-large;
+                message := FluentText {
+                    x: FluentMetrics.spacing-large;
+                    y: FluentMetrics.spacing-large;
+                    width: max(0px, parent.width - 2 * self.x);
+                    text: bar.selected-index < 0 ? "Choose a file view" : bar.items[bar.selected-index].text + " files";
+                    wrap: word-wrap;
+                }
+            }
+
+            HorizontalLayout {
+                alignment: start;
+                clear := Button {
+                    text: "Clear selection";
+                    minimum-target: root.target-size;
+                    enabled: root.active;
+                    clicked => { bar.set-selected-index(-1); }
+                }
+            }
+        }
+    }
+}

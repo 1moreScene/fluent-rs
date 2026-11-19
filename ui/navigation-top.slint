@@ -1,0 +1,308 @@
+import { NavigationChevron } from "navigation-chevron.slint";
+import { InfoBadge } from "info-badge.slint";
+import { FluentFocus } from "interaction.slint";
+import { NavigationIconKind, NavigationItemIcon } from "navigation-item-icon.slint";
+import { ItemData } from "item-presenter.slint";
+import { NavigationIndicatorMotion } from "navigation-motion.slint";
+import { NavigationActionSurface, NavigationIconButton, NavigationPane } from "navigation-pane.slint";
+import { OverlayArea, OverlayHost } from "overlay-host.slint";
+import { FluentText } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+import { NavigationItemDetails, NavigationItemKind, NavigationTree } from "navigation-tree.slint";
+import { TopNavigationArrangement, TopNavigationLayout, TopNavigationSlot } from "navigation-layout.slint";
+
+component TopNavigationItem inherits NavigationActionSurface {
+    in property <bool> has-icon;
+    in property <NavigationItemDetails> details;
+    in property <bool> has-children;
+    in property <bool> expanded;
+    in property <bool> icon-only;
+    in property <int> index;
+    in property <int> request-focus: -1;
+    in property <bool> tab-stop;
+    callback focused(int);
+    callback unfocused(int);
+    property <bool> requested: root.index == root.request-focus;
+    property <bool> destination: root.details.kind == NavigationItemKind.destination;
+    property <length> leading: FluentMetrics.navigation-top-padding;
+    property <length> gap: FluentMetrics.spacing-medium;
+    property <length> chevron-space: root.has-children ? FluentMetrics.navigation-top-padding : 0px;
+    property <length> badge-space: badge.visible ? badge.width : 0px;
+    top-item: true;
+    focus-on-tab-navigation: root.tab-stop;
+    accessible-role: list-item;
+    accessible-expanded: root.has-children && root.expanded;
+    accessible-item-index: root.index;
+    accessible-item-selected: root.selected;
+    changed requested => { if (root.requested && root.enabled) { root.focus(); } }
+    focus-changed-event => { if (root.has-focus) { root.focused(root.index); } else { root.unfocused(root.index); } }
+
+    if root.destination && root.has-icon : NavigationItemIcon {
+        x: root.icon-only ? max(0px, (parent.width - root.badge-space - root.chevron-space - self.width) / 2) : root.leading;
+        y: (parent.height - self.height) / 2;
+        source: root.icon;
+        foreground: root.foreground;
+        kind: root.details.icon-kind;
+        hovered: root.hovered;
+        pressed: root.pressed;
+    }
+    if !root.icon-only && root.details.kind != NavigationItemKind.separator : FluentText {
+        x: root.leading + (root.has-icon ? FluentMetrics.navigation-icon-size + root.gap : 0px);
+        y: 0px;
+        width: max(0px, parent.width - self.x - root.leading - root.chevron-space - root.badge-space);
+        height: 100%;
+        text: root.label;
+        color: root.destination ? root.foreground : FluentTheme.text-secondary;
+        font-weight: root.destination ? FluentMetrics.regular-weight : FluentMetrics.strong-weight;
+        vertical-alignment: center;
+        overflow: elide;
+        accessible-role: none;
+    }
+    if root.details.kind == NavigationItemKind.separator : Rectangle {
+        width: FluentMetrics.control-stroke;
+        height: FluentMetrics.navigation-icon-size;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        background: FluentTheme.navigation-divider;
+    }
+    if root.has-children : NavigationChevron {
+        x: parent.width - root.leading - self.width;
+        y: (parent.height - self.height) / 2;
+        expanded: root.expanded;
+        hovered: root.hovered;
+        pressed: root.pressed;
+        foreground: root.foreground;
+    }
+    badge := InfoBadge {
+        visible: root.destination && root.details.has-badge;
+        x: parent.width - root.leading - root.chevron-space - self.width;
+        y: (parent.height - self.height) / 2;
+        value: root.details.badge-value;
+    }
+
+}
+
+export component NavigationTopBar inherits FocusScope {
+    in property <bool> active: true;
+    in property <[ItemData]> items;
+    in property <[image]> icons;
+    in property <[NavigationItemDetails]> details;
+    in property <int> open-branch: -1;
+    in property <int> selected-index: -1;
+    in property <int> footer-start: -1;
+    in property <length> minimum-target;
+    in property <length> trailing-width;
+    in property <OverlayArea> viewport;
+    in property <bool> selection-follows-focus;
+    out property <bool> overflow-open: popup.open;
+    out property <bool> overflow-acrylic: popup.acrylic-applied;
+    out property <[int]> overflow-items: arrangement.overflow;
+    out property <int> overflow-count: arrangement.overflow.length;
+    out property <length> indicator-width: indicator.extent;
+    out property <OverlayArea> overflow-bounds: popup.panel-bounds;
+    out property <Point> overflow-center: { x: more.absolute-position.x + more.width / 2, y: more.absolute-position.y + more.height / 2 };
+    out property <length> footer-boundary: arrangement.footer.length > 0
+        ? top-items.x + arrangement.footer[0].x : root.width;
+    out property <Point> items-origin: top-items.absolute-position;
+    out property <[TopNavigationSlot]> primary: arrangement.primary;
+    out property <int> focused-index: -1;
+    callback invoke(int, bool, OverlayArea);
+    callback focus-select(int);
+
+    property <[length]> measured;
+    property <int> focus-request: -1;
+    property <int> tab-anchor: -1;
+    property <bool> overflow-held;
+    property <length> more-width: max(FluentMetrics.navigation-icon-slot, root.minimum-target);
+    property <[int]> top-level: NavigationTree.visible(root.details, [], 0, root.items.length, -1, false);
+    property <[int]> footer-indices: root.footer-start < 0 ? [] : TopNavigationLayout.indices(root.footer-start, root.items.length);
+    property <int> selected-top: NavigationTree.ancestor(root.details, root.top-level, root.selected-index);
+    property <[int]> opened-items;
+    property <length> opened-width;
+    property <Point> opened-anchor;
+    property <TopNavigationArrangement> arrangement: TopNavigationLayout.arrange(root.top-level, root.measured, {
+        width: top-items.width, more-width: root.more-width, minimum-item-width: FluentMetrics.navigation-icon-slot,
+        selected: root.selected-top, footer-start: root.footer-start,
+        recovery-margin: root.overflow-held ? FluentMetrics.navigation-overflow-recovery : 0px, trailing-width: root.trailing-width,
+    });
+    changed overflow-count => { root.overflow-held = root.overflow-count > 0; }
+    property <length> item-height: max(FluentMetrics.navigation-top-item-height, root.minimum-target);
+    property <length> popup-inset: FluentMetrics.control-stroke + FluentMetrics.navigation-item-inset-y;
+    property <length> menu-width: max(FluentMetrics.flyout-min-width, root.arrangement.overflow-width + 2 * FluentMetrics.navigation-top-padding);
+
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+    accessible-role: navigation;
+
+    key-pressed(event) => {
+        if (root.focused-index < 0 || (event.text != Key.LeftArrow && event.text != Key.RightArrow)) { return reject; }
+        let target = TopNavigationLayout.step(root.items, root.arrangement.primary, root.arrangement.footer,
+            root.focused-index, event.text == Key.LeftArrow ? -1 : 1);
+        if (target >= 0) {
+            FluentFocus.keyboard-input = true;
+            root.focus-request = target;
+            if (root.selection-follows-focus) { root.focus-select(target); }
+        } else if (event.text == Key.RightArrow && root.overflow-count > 0) {
+            more.focus();
+        }
+        return accept;
+    }
+
+    for index in (root.active ? root.top-level : []) : FluentText {
+        property <NavigationItemDetails> details: NavigationTree.details(root.details, index);
+        property <bool> has-icon: self.details.icon-kind != NavigationIconKind.static-image
+            || (index < root.icons.length && root.icons[index].width > 0);
+        text: root.items[index].text;
+        font-weight: self.details.kind == NavigationItemKind.header ? FluentMetrics.strong-weight : FluentMetrics.regular-weight;
+        visible: false;
+        accessible-role: none;
+        measured-badge := InfoBadge {
+            visible: false;
+            value: parent.details.badge-value;
+        }
+        property <length> badge-width: self.details.has-badge ? measured-badge.width : 0px;
+        property <length> item-width: self.details.kind == NavigationItemKind.separator ? FluentMetrics.navigation-separator-extent
+            : (self.has-icon && (self.details.icon-only || self.text == "")
+            ? FluentMetrics.navigation-icon-slot + self.badge-width
+            : self.preferred-width + 2 * FluentMetrics.navigation-top-padding
+                + (self.has-icon ? FluentMetrics.navigation-icon-size + FluentMetrics.spacing-medium : 0px)
+                + 2 * FluentMetrics.navigation-item-inset-x
+                + (NavigationTree.has-children(root.details, index) ? FluentMetrics.navigation-top-padding : 0px)
+                + self.badge-width);
+        init => { root.measured = TopNavigationLayout.measure(root.measured, index, self.item-width); }
+        changed item-width => { root.measured = TopNavigationLayout.measure(root.measured, index, self.item-width); }
+    }
+
+    top-items := Rectangle {
+        x: FluentMetrics.navigation-item-inset-x;
+        y: 0px;
+        width: max(0px, root.width - 2 * self.x);
+        height: 100%;
+        clip: true;
+        accessible-role: list;
+
+        for slot in root.arrangement.primary : TopNavigationItem {
+            x: slot.x + (self.details.kind == NavigationItemKind.separator ? 0px : FluentMetrics.navigation-item-inset-x);
+            y: (parent.height - self.height) / 2;
+            width: max(0px, slot.width - (self.details.kind == NavigationItemKind.separator ? 0px : 2 * FluentMetrics.navigation-item-inset-x));
+            height: root.item-height;
+            index: slot.index;
+            selected: root.selected-top == slot.index;
+            details: NavigationTree.details(root.details, slot.index);
+            has-children: NavigationTree.has-children(root.details, slot.index);
+            expanded: root.open-branch == slot.index;
+            enabled: self.details.kind == NavigationItemKind.destination && !root.items[slot.index].disabled;
+            label: root.items[slot.index].text;
+            has-icon: self.details.icon-kind != NavigationIconKind.static-image || self.icon.width > 0;
+            icon-only: self.has-icon && (self.details.icon-only || self.label == "");
+            icon: slot.index < root.icons.length ? root.icons[slot.index] : @image-url("");
+            request-focus: root.focus-request;
+            tab-stop: root.tab-anchor >= 0 ? root.tab-anchor == slot.index
+                : root.arrangement.indicator-x >= 0px ? self.selected : slot.x == 0px;
+            activated => { root.invoke(slot.index, false, { x: self.absolute-position.x, y: self.absolute-position.y, width: self.width, height: self.height }); }
+            focused(index) => { root.remember-focus(index); }
+            unfocused(index) => { if (root.focused-index == index) { root.focused-index = -1; } }
+        }
+        // Selecting the footer should not reset its AnimatedIcon release transition.
+        for entry-index in root.footer-indices : TopNavigationItem {
+            property <TopNavigationSlot> slot: TopNavigationLayout.slot(root.arrangement.footer, entry-index);
+            visible: slot.index >= 0 && slot.width > 0px;
+            x: slot.x;
+            y: (parent.height - self.height) / 2;
+            width: slot.width;
+            height: root.item-height;
+            index: entry-index;
+            selected: root.selected-top == entry-index;
+            details: NavigationTree.details(root.details, entry-index);
+            has-children: NavigationTree.has-children(root.details, entry-index);
+            expanded: root.open-branch == entry-index;
+            enabled: self.visible && self.details.kind == NavigationItemKind.destination && !root.items[entry-index].disabled;
+            label: root.items[entry-index].text;
+            has-icon: self.details.icon-kind != NavigationIconKind.static-image || self.icon.width > 0;
+            icon-only: self.has-icon && (self.details.icon-only || self.label == "");
+            icon: entry-index < root.icons.length ? root.icons[entry-index] : @image-url("");
+            request-focus: root.focus-request;
+            tab-stop: self.visible;
+            activated => { root.invoke(entry-index, false, { x: self.absolute-position.x, y: self.absolute-position.y, width: self.width, height: self.height }); }
+            focused(index) => { root.remember-focus(index); }
+            unfocused(index) => { if (root.focused-index == index) { root.focused-index = -1; } }
+        }
+        if indicator.has-indicator : Rectangle {
+            x: indicator.top;
+            y: parent.height - FluentMetrics.navigation-top-marker-inset - self.height;
+            width: indicator.extent;
+            height: FluentMetrics.navigation-pill-width;
+            border-radius: FluentMetrics.navigation-pill-radius;
+            background: FluentTheme.navigation-selection;
+        }
+    }
+
+    more := NavigationIconButton {
+        x: top-items.x + root.arrangement.more-x;
+        y: (root.height - self.height) / 2;
+        width: root.more-width;
+        height: max(FluentMetrics.navigation-icon-slot, root.minimum-target);
+        visible: root.overflow-count > 0;
+        enabled: self.visible;
+        top-item: true;
+        label: "More";
+        icon: @image-url("icons/fluent/more-horizontal-20-regular.svg");
+        accessible-expanded: popup.open;
+        activated => {
+            if (popup.open) { popup.dismiss-with-transition(); }
+            else {
+                root.opened-items = root.arrangement.overflow;
+                root.opened-width = root.menu-width;
+                root.opened-anchor = { x: self.absolute-position.x + self.width - root.opened-width, y: self.absolute-position.y };
+                popup.show();
+            }
+        }
+    }
+
+    indicator := NavigationIndicatorMotion {
+        index: root.arrangement.indicator-x >= 0px ? root.selected-top : -1;
+        position: max(0px, root.arrangement.indicator-x - self.pill-height / 2);
+        pill-height: FluentMetrics.navigation-pill-height;
+    }
+
+    popup := OverlayHost {
+        active: root.active;
+        area: root.viewport;
+        acrylic: true;
+        luminosity-acrylic: true;
+        flyout-transition: true;
+        anchor: root.opened-anchor;
+        anchor-height: more.height;
+        preferred-panel-width: root.opened-width;
+        preferred-panel-height: FluentMetrics.navigation-row-step(root.minimum-target) * root.opened-items.length + 2 * root.popup-inset;
+        preferred-placement: bottom;
+        anchor-gap: 0px;
+
+        NavigationPane {
+            x: FluentMetrics.control-stroke;
+            y: root.popup-inset;
+            width: max(0px, popup.panel-bounds.width - 2 * self.x);
+            height: max(0px, popup.panel-bounds.height - 2 * self.y);
+            items: root.items;
+            indices: root.opened-items;
+            details: root.details;
+            icons: root.icons;
+            show-labels: true;
+            overflow-style: true;
+            minimum-target: root.minimum-target;
+            selected-index: root.selected-index;
+            item-invoked(index, bounds) => {
+                if (NavigationTree.has-children(root.details, index)) { popup.dismiss(); }
+                else { popup.dismiss-with-transition(); }
+                root.invoke(index, true, bounds);
+            }
+        }
+    }
+
+    function remember-focus(index: int) {
+        root.focused-index = index;
+        root.tab-anchor = index;
+        root.focus-request = -1;
+    }
+}

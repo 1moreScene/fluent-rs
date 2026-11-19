@@ -1,0 +1,299 @@
+import { InfoBadge } from "../../../ui/info-badge.slint";
+import { Button } from "../../../ui/button.slint";
+import { ComboBox } from "../../../ui/combo-box.slint";
+import { Frame, NavigationTransition } from "../../../ui/frame.slint";
+import { Page } from "../../../ui/page.slint";
+import { PageHost } from "../../../ui/page-host.slint";
+import { NavigationDisplayMode, NavigationPaneDisplayMode, NavigationView } from "../../../ui/navigation-view.slint";
+import { TopNavigationSlot } from "../../../ui/navigation-layout.slint";
+import { NavigationIconButton } from "../../../ui/navigation-pane.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+export struct NavigationProbe {
+    selected: int,
+    route: int,
+    focused: int,
+    mode: NavigationDisplayMode,
+    pane-open: bool,
+    drawer-open: bool,
+    drawer-acrylic: bool,
+    drawer-progress: float,
+    pane-width: length,
+    indicator-height: length,
+    content: OverlayArea,
+    drawer: OverlayArea,
+    toggle: Point,
+    toggle-focused: bool,
+    items: Point,
+    item-step: length,
+    back: Point,
+    forward: Point,
+    can-go-back: bool,
+    can-go-forward: bool,
+    transitioning: bool,
+    page-progress: duration,
+    transition: NavigationTransition,
+    footer: Point,
+    child-flyout-open: bool,
+    child-flyout-bounds: OverlayArea,
+    expanded-items: [int],
+    overflow-open: bool,
+    overflow-acrylic: bool,
+    overflow-items: [int],
+    overflow-count: int,
+    overflow: Point,
+    overflow-bounds: OverlayArea,
+    top-items: [TopNavigationSlot],
+    top-origin: Point,
+    pane-visible: bool,
+    pane-custom-height: length,
+    top-custom-width: length,
+    slot-activations: int,
+}
+
+component PaneAction inherits NavigationIconButton {
+    icon: @image-url("../../../ui/icons/fluent/mail-20-regular.svg");
+    label: "Add notification";
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+}
+
+export component NavigationViewPage inherits PageHost {
+    in property <OverlayArea> viewport;
+    in property <length> target-size;
+    in property <bool> active: true;
+    in-out property <NavigationPaneDisplayMode> pane-display-mode;
+    in-out property <bool> pane-visible: true;
+    in-out property <bool> custom-pane;
+    out property <int> slot-activations;
+    out property <int> notification-count: 3 + root.slot-activations;
+    out property <int> history-length: frame.history-length;
+    public function navigate-example(index: int) { frame.navigate(index); }
+    out property <NavigationProbe> probe: {
+        selected: nav.selected-index, route: frame.current-page, focused: nav.focused-index, mode: nav.display-mode,
+        pane-open: nav.pane-open, drawer-open: nav.drawer-open, drawer-acrylic: nav.drawer-acrylic, drawer-progress: nav.drawer-progress,
+        pane-width: nav.pane-width, indicator-height: nav.indicator-height,
+        content: nav.content-bounds, drawer: nav.drawer-bounds, toggle: nav.toggle-center,
+        toggle-focused: nav.toggle-focused, items: nav.items-origin, item-step: nav.item-step,
+        back: root.pane-display-mode == NavigationPaneDisplayMode.top ? nav.back-center : { x: back.absolute-position.x + back.width / 2, y: back.absolute-position.y + back.height / 2 },
+        forward: { x: forward.absolute-position.x + forward.width / 2, y: forward.absolute-position.y + forward.height / 2 },
+        can-go-back: frame.can-go-back, can-go-forward: frame.can-go-forward, transitioning: frame.transitioning,
+        page-progress: frame.route.elapsed, transition: frame.route.transition, footer: nav.footer-origin,
+        child-flyout-open: nav.child-flyout-open, child-flyout-bounds: nav.child-flyout-bounds, expanded-items: nav.expanded-items,
+        overflow-items: nav.overflow-items, overflow-open: nav.overflow-open, overflow-acrylic: nav.overflow-acrylic, overflow-count: nav.overflow-count,
+        overflow: nav.overflow-center, overflow-bounds: nav.overflow-bounds,
+        top-items: nav.top-items, top-origin: nav.top-items-origin, pane-visible: root.pane-visible,
+        pane-custom-height: nav.pane-custom-height, top-custom-width: nav.top-custom-width, slot-activations: root.slot-activations,
+    };
+
+    property <[{ title: string, body: string }]> destinations: [
+        { title: "Home", body: "Your workspace starts here. Open a destination from the navigation pane." },
+        { title: "Library", body: "Browse the documents and resources saved to your workspace." },
+        { title: "Archive", body: "Archived items will appear here." },
+        { title: "Mail", body: "Read messages and updates from your workspace." },
+        { title: "", body: "" },
+        { title: "", body: "" },
+        { title: "", body: "" },
+        { title: "Reports", body: "View reports grouped with other workspace tools." },
+        { title: "Recent files", body: "Return to documents you recently opened." },
+        { title: "Settings", body: "Manage your workspace preferences." },
+    ];
+
+    property <[NavigationPaneDisplayMode]> modes: [auto, left, top, left-compact, left-minimal];
+    property <int> mode-index: root.pane-display-mode == NavigationPaneDisplayMode.left ? 1
+        : root.pane-display-mode == NavigationPaneDisplayMode.top ? 2
+        : root.pane-display-mode == NavigationPaneDisplayMode.left-compact ? 3
+        : root.pane-display-mode == NavigationPaneDisplayMode.left-minimal ? 4 : 0;
+    changed mode-index => { mode.set-selected-index(root.mode-index); }
+    init => { mode.set-selected-index(root.mode-index); }
+
+    toolbar := FlexboxLayout {
+        x: FluentMetrics.focus-outset;
+        y: FluentMetrics.focus-outset;
+        width: max(0px, root.width - 2 * self.x);
+        height: self.preferred-height;
+        spacing: FluentMetrics.spacing-medium;
+        alignment: start;
+
+        mode := ComboBox {
+            label: "Pane display mode";
+            preferred-width: 148px * FluentTheme.ui-scale;
+            items: [
+                { text: "Auto" }, { text: "Left" }, { text: "Top" },
+                { text: "LeftCompact" }, { text: "LeftMinimal" },
+            ];
+            viewport: root.viewport;
+            active: root.active;
+            minimum-target: root.target-size;
+            selection-changed(index) => {
+                if (index >= 0 && index < root.modes.length) { root.pane-display-mode = root.modes[index]; }
+            }
+        }
+
+        Button {
+            text: root.pane-visible ? "Hide pane" : "Show pane";
+            minimum-target: root.target-size;
+            clicked => { root.pane-visible = !root.pane-visible; }
+        }
+        Button {
+            text: root.custom-pane ? "Hide custom content" : "Custom pane content";
+            minimum-target: root.target-size;
+            clicked => { root.custom-pane = !root.custom-pane; }
+        }
+    }
+
+    nav := NavigationView {
+        x: 0px;
+        y: toolbar.y + toolbar.height + FluentMetrics.spacing-medium;
+        width: 100%;
+        height: max(0px, root.height - self.y);
+        active: root.active;
+        minimum-target: root.target-size;
+        viewport: root.viewport;
+        pane-display-mode: root.pane-display-mode;
+        pane-title: "Workspace";
+        footer-start: 9;
+        item-details: [
+            { index: 3, parent-index: -1, selects-on-invoked: true, has-badge: true, badge-value: root.notification-count },
+            { index: 4, parent-index: -1, kind: header },
+            { index: 5, parent-index: -1, kind: separator },
+            { index: 6, parent-index: -1, selects-on-invoked: false },
+            { index: 7, parent-index: 6, selects-on-invoked: true },
+            { index: 8, parent-index: 6, selects-on-invoked: true },
+            { index: 9, parent-index: -1, selects-on-invoked: true, icon-only: true, icon-kind: animated-settings },
+        ];
+        pane-visible: root.pane-visible;
+        show-back-button: root.pane-display-mode == NavigationPaneDisplayMode.top;
+        back-enabled: frame.can-go-back;
+        back-requested => { frame.go-back(); }
+        initial-selected-index: 0;
+        items: [
+            { text: "Home", disabled: false },
+            { text: "Library", disabled: false },
+            { text: "Archive", disabled: true },
+            { text: "Mail", disabled: false },
+            { text: "Workspace tools", disabled: true },
+            { text: "", disabled: true },
+            { text: "Documents", disabled: false },
+            { text: "Reports", disabled: false },
+            { text: "Recent files", disabled: false },
+            { text: "Settings", disabled: false },
+        ];
+        icons: [
+            @image-url("../../../ui/icons/fluent/home-20-regular.svg"),
+            @image-url("../../../ui/icons/fluent/library-20-regular.svg"),
+            @image-url("../../../ui/icons/fluent/archive-20-regular.svg"),
+            @image-url("../../../ui/icons/fluent/mail-20-regular.svg"),
+            @image-url(""),
+            @image-url(""),
+            @image-url("../../../ui/icons/fluent/library-20-regular.svg"),
+            @image-url("../../../ui/icons/fluent/archive-20-regular.svg"),
+            @image-url("../../../ui/icons/fluent/library-20-regular.svg"),
+            @image-url("../../../ui/icons/fluent/settings-20-regular.svg"),
+        ];
+        selection-changed(index) => { frame.navigate-with-transition(index, nav.recommended-transition); }
+
+        pane-header << HorizontalLayout {
+            if root.custom-pane : FluentText { text: "Notifications"; vertical-alignment: center; }
+        }
+        pane-custom-content << HorizontalLayout {
+            alignment: start;
+            if root.custom-pane : PaneAction { activated => { root.slot-activations += 1; } }
+        }
+        pane-footer << HorizontalLayout {
+            alignment: center;
+            if root.custom-pane : InfoBadge { value: root.slot-activations; label: "Added notifications"; }
+        }
+        top-header << HorizontalLayout {
+            if root.custom-pane : FluentText { text: "Tools"; vertical-alignment: center; }
+        }
+        top-custom-content << HorizontalLayout {
+            if root.custom-pane : PaneAction { activated => { root.slot-activations += 1; } }
+        }
+        top-footer << HorizontalLayout {
+            if root.custom-pane : InfoBadge { value: root.slot-activations; label: "Added notifications"; }
+        }
+
+
+        Rectangle {
+            width: 100%;
+            height: 100%;
+
+            HorizontalLayout {
+                x: FluentMetrics.spacing-medium;
+                y: 0px;
+                width: min(parent.width - self.x, self.preferred-width);
+                height: max(FluentMetrics.navigation-header-height, root.target-size);
+                spacing: FluentMetrics.spacing-small;
+                alignment: start;
+
+                back := NavigationIconButton {
+                    width: max(FluentMetrics.navigation-icon-slot, root.target-size);
+                    height: max(FluentMetrics.navigation-item-height, root.target-size);
+                    icon: @image-url("../../../ui/icons/fluent/arrow-left-20-regular.svg");
+                    label: "Back";
+                    visible: root.pane-display-mode != NavigationPaneDisplayMode.top;
+                    enabled: frame.can-go-back;
+                    activated => { frame.go-back(); }
+                }
+                forward := NavigationIconButton {
+                    width: max(FluentMetrics.navigation-icon-slot, root.target-size);
+                    height: max(FluentMetrics.navigation-item-height, root.target-size);
+                    icon: @image-url("../../../ui/icons/fluent/arrow-right-20-regular.svg");
+                    label: "Forward";
+                    enabled: frame.can-go-forward;
+                    activated => { frame.go-forward(); }
+                }
+            }
+
+            frame := Frame {
+                x: 0px;
+                y: max(FluentMetrics.navigation-header-height, root.target-size);
+                width: 100%;
+                height: max(0px, parent.height - self.y);
+                page-count: root.destinations.length;
+                initial-page: 0;
+                history-limit: 64;
+                navigated(index, action) => { nav.set-selected-index(index); }
+
+                for destination[index] in root.destinations : Page {
+                    route-id: index;
+                    route: frame.route;
+                    title: destination.title;
+                    width: 100%;
+                    height: 100%;
+
+                    FluentScrollView {
+                        width: 100%;
+                        height: 100%;
+                        content-height: max(self.height, destination-content.preferred-height);
+                        destination-content := VerticalLayout {
+                            x: 0px;
+                            y: 0px;
+                            width: 100%;
+                            height: self.preferred-height;
+                            padding: FluentMetrics.spacing-page;
+                            spacing: FluentMetrics.spacing-medium;
+                            alignment: start;
+
+                            FluentText {
+                                text: destination.title;
+                                font-size: FluentMetrics.title-size;
+                                font-weight: FluentMetrics.strong-weight;
+                                wrap: word-wrap;
+                            }
+                            FluentText {
+                                text: destination.body;
+                                color: FluentTheme.text-secondary;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

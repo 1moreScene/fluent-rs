@@ -1,0 +1,197 @@
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { ButtonState, FluentFocusScope, FluentPressable } from "interaction.slint";
+import { ItemData } from "item-presenter.slint";
+import { FluentMotion } from "motion.slint";
+import { FluentFocusRing, FluentText } from "primitives.slint";
+import { FluentScrollView } from "scroll-view.slint";
+import { ListDirection, ListSelectionMode, SelectionLogic, SelectionModel } from "selection-model.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+component SelectorBarItem inherits FluentPressable {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> show-label;
+    in property <bool> selected;
+    in property <bool> keyboard-focused;
+    in property <length> minimum-target;
+
+    property <color> ink: !self.enabled ? FluentTheme.text-disabled
+        : FluentTheme.high-contrast ? (self.hovered || self.pressed ? FluentTheme.contrast-disabled : FluentTheme.contrast-text)
+        : self.state == ButtonState.pressed && !root.selected ? FluentTheme.text-tertiary
+        : self.hovered || self.pressed ? FluentTheme.text-secondary : FluentTheme.text-primary;
+
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+    accessible-role: list-item;
+    accessible-label: root.text;
+    accessible-enabled: self.enabled;
+    accessible-item-selected: root.selected;
+    accessible-action-default => { if (root.enabled) { root.activated(); } }
+
+    min-width: max(root.minimum-target, content.preferred-width);
+    min-height: max(root.minimum-target, content.preferred-height + FluentMetrics.selector-pill-height);
+    preferred-width: self.min-width;
+    preferred-height: self.min-height;
+
+    content := HorizontalLayout {
+        width: parent.width;
+        height: max(0px, parent.height - FluentMetrics.selector-pill-height);
+        padding-left: FluentMetrics.selector-item-padding-x;
+        padding-right: self.padding-left;
+        padding-top: FluentMetrics.selector-item-padding-top;
+        padding-bottom: FluentMetrics.selector-item-padding-bottom;
+        spacing: FluentMetrics.spacing-medium;
+        alignment: center;
+
+        if root.icon.width > 0 : Rectangle {
+            width: FluentMetrics.navigation-icon-size - 2 * FluentMetrics.selector-icon-inset;
+            height: FluentMetrics.navigation-icon-size;
+            FluentSystemIcon {
+                width: FluentMetrics.navigation-icon-size * FluentMetrics.selector-icon-scale;
+                height: self.width;
+                source: root.icon;
+                foreground: root.ink;
+            }
+        }
+        if root.show-label && root.text != "" : FluentText {
+            text: root.text;
+            color: root.ink;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+
+    Rectangle {
+        width: FluentMetrics.selector-pill-base * (root.selected ? 4 : 1);
+        height: FluentMetrics.selector-pill-height;
+        x: (parent.width - self.width) / 2;
+        y: parent.height - self.height;
+        border-radius: self.height / 2;
+        opacity: root.selected ? 1 : 0;
+        background: !root.enabled ? FluentTheme.accent-fill-disabled
+            : FluentTheme.high-contrast ? FluentTheme.contrast-highlight : FluentTheme.accent-fill;
+        animate width, opacity {
+            enabled: FluentMotion.enabled;
+            duration: FluentMotion.control-fast-duration;
+            easing: FluentMotion.control-fast-out-slow-in;
+        }
+    }
+
+    if root.keyboard-focused : FluentFocusRing {
+        x: 0px;
+        y: FluentMetrics.focus-outset;
+        width: parent.width;
+        height: max(0px, parent.height - 2 * self.y);
+        horizontal-outset: 0px;
+    }
+}
+
+export component SelectorBar inherits FluentFocusScope {
+    in property <[ItemData]> items;
+    in property <[image]> icons;
+    in property <bool> show-labels: true;
+    in property <string> label;
+    in property <length> minimum-target;
+    in property <bool> active: true;
+    out property <int> selected-index: selection.selected-index;
+    out property <int> focused-index: root.has-focus && root.operable ? root.selected-index : -1;
+    out property <length> scroll-offset: view.horizontal-offset;
+    callback selection-changed(int);
+
+    property <int> first-enabled: SelectionLogic.target(root.items, -1, ListDirection.first);
+    property <bool> operable: root.active && root.enabled;
+    focus-on-click: false;
+    focus-on-tab-navigation: root.operable && root.first-enabled >= 0;
+    accessible-role: list;
+    accessible-label: root.label;
+    accessible-orientation: horizontal;
+    accessible-enabled: root.operable;
+    accessible-item-count: root.items.length;
+    accessible-delegate-focus: root.focused-index;
+    min-width: 0px;
+    preferred-width: strip.preferred-width;
+    min-height: strip.preferred-height;
+    preferred-height: self.min-height;
+    vertical-stretch: 0;
+
+    public function set-selected-index(index: int) {
+        selection.set-index(index);
+    }
+
+    changed selected-index => { root.selection-changed(root.selected-index); }
+    focus-changed-event => {
+        if (root.has-focus && !selection.enabled(root.selected-index)) {
+            root.set-selected-index(root.first-enabled);
+        }
+    }
+
+    key-pressed(event) => {
+        if (!root.operable || event.modifiers.alt) { return reject; }
+        let direction = event.text == Key.LeftArrow ? ListDirection.previous
+            : event.text == Key.RightArrow ? ListDirection.next
+            : event.text == Key.Home ? ListDirection.first : ListDirection.last;
+        if (event.text != Key.LeftArrow && event.text != Key.RightArrow
+            && event.text != Key.Home && event.text != Key.End) { return reject; }
+        let target = SelectionLogic.target(root.items, root.selected-index, direction);
+        if (target >= 0) {
+            root.use-keyboard-focus();
+            selection.activate(target, false);
+        }
+        return accept;
+    }
+
+    selection := SelectionModel {
+        items: root.items;
+        mode: ListSelectionMode.single;
+    }
+
+    view := FluentScrollView {
+        width: parent.width;
+        height: parent.height;
+        content-width: max(self.width, strip.preferred-width);
+        horizontal-scrollbar: false;
+        vertical-scrollbar: false;
+        mouse-drag-pan-enabled: false;
+
+        strip := HorizontalLayout {
+            width: parent.width;
+            height: parent.height;
+            padding-top: FluentMetrics.selector-bar-padding-y;
+            padding-bottom: self.padding-top;
+            alignment: start;
+
+            for item[index] in root.items : SelectorBarItem {
+                property <bool> reveal-selected: root.active && self.selected;
+                property <length> viewport-width: view.width;
+
+                text: item.text;
+                icon: index < root.icons.length ? root.icons[index] : @image-url("");
+                show-label: root.show-labels;
+                enabled: root.operable && !item.disabled;
+                selected: root.selected-index == index;
+                keyboard-focused: self.enabled && root.focus-visible && root.focused-index == index;
+                minimum-target: root.minimum-target;
+                accessible-item-index: index;
+
+                function reveal() {
+                    if (!self.reveal-selected) { return; }
+                    let leading = self.x;
+                    let trailing = leading + self.width;
+                    if (leading < view.horizontal-offset || self.width >= view.width) {
+                        view.scroll-to({ x: leading, y: 0px }, ScrollBehavior.instant);
+                    } else if (trailing > view.horizontal-offset + view.width) {
+                        view.scroll-to({ x: trailing - view.width, y: 0px }, ScrollBehavior.instant);
+                    }
+                }
+                changed reveal-selected => { self.reveal(); }
+                changed viewport-width => { self.reveal(); }
+
+                activated => {
+                    root.use-pointer-focus();
+                    selection.activate(index, false);
+                    root.focus();
+                }
+            }
+        }
+    }
+}

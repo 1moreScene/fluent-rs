@@ -1,4 +1,4 @@
-import { ButtonState, FluentPointerArea } from "interaction.slint";
+import { ButtonState, FluentFocusScope, FluentPointerArea } from "interaction.slint";
 import { FluentMotion } from "motion.slint";
 import { FluentFocusRing } from "primitives.slint";
 import { FluentRange } from "range.slint";
@@ -118,7 +118,7 @@ export component SliderSurface {
     }
 }
 
-export component Slider inherits FocusScope {
+export component Slider inherits FluentFocusScope {
     in property <float> minimum: 0;
     in property <float> maximum: 100;
     in-out property <float> value: minimum;
@@ -134,9 +134,7 @@ export component Slider inherits FocusScope {
     callback value-changed(float);
     out property <ButtonState> state: !self.enabled ? ButtonState.disabled : dragging ? ButtonState.pressed
         : pointer.pointer-inside ? ButtonState.pointer-over : ButtonState.normal;
-    out property <bool> focus-visible: self.enabled && self.has-focus && keyboard-focus;
 
-    property <bool> keyboard-focus;
     property <bool> vertical: orientation == Orientation.vertical;
     property <bool> reversed: direction-reversed != (!vertical && right-to-left);
     property <float> upper: max(minimum, maximum);
@@ -200,12 +198,6 @@ export component Slider inherits FocusScope {
         commit-value(nearest-step(minimum + span * position, interval));
     }
 
-    focus-gained(reason) => {
-        if (reason != FocusReason.window-activation) { root.keyboard-focus = reason != FocusReason.pointer-click; }
-    }
-    focus-lost(reason) => {
-        if (reason != FocusReason.window-activation) { root.keyboard-focus = false; }
-    }
     changed enabled => {
         if (!root.enabled) { root.dragging = false; }
     }
@@ -219,7 +211,7 @@ export component Slider inherits FocusScope {
         } else if (event.text == Key.UpArrow || event.text == Key.DownArrow) {
             root.step((event.text == Key.UpArrow) != root.direction-reversed);
         } else { return reject; }
-        root.keyboard-focus = true;
+        root.use-keyboard-focus();
         return accept;
     }
 
@@ -239,7 +231,7 @@ export component Slider inherits FocusScope {
         width: 100%;
         height: 100%;
         enabled: root.enabled;
-        pointer-event(event) => {
+        interaction-event(event) => {
             if (event.kind == PointerEventKind.cancel
                 || (event.kind == PointerEventKind.up && event.button == PointerEventButton.left)) {
                 root.dragging = false;
@@ -247,7 +239,7 @@ export component Slider inherits FocusScope {
             if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
                 root.dragging = true;
                 root.focus();
-                root.keyboard-focus = false;
+                root.use-pointer-focus();
                 let axis = root.vertical ? self.mouse-y : self.mouse-x;
                 let cross = root.vertical ? self.mouse-x - self.width / 2 : self.mouse-y - self.height / 2;
                 let offset = axis - surface.center;

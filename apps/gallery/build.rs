@@ -1,3 +1,3 @@
 fn main() -> Result<(), slint_build::CompileError> {
-    slint_build::compile("ui/gallery.slint")
+    slint_build::compile("slint-project.json")
 }

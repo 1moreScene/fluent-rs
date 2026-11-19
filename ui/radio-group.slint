@@ -1,4 +1,5 @@
 import { RadioOption } from "radio-button.slint";
+import { FluentFocus } from "interaction.slint";
 import { FluentText } from "primitives.slint";
 import { FluentMetrics, FluentTheme } from "tokens.slint";
 
@@ -68,6 +69,7 @@ export component RadioGroup inherits FocusScope {
         let from = root.focus-request >= 0 ? root.focus-request : root.focused-index;
         let target = RadioNavigation.target(root.items, root.column-count, from, direction);
         if (root.can-focus(target)) {
+            FluentFocus.keyboard-input = true;
             root.focus-request = target;
             if (!event.modifiers.control) { root.select(target); }
         }

@@ -1,0 +1,90 @@
+import { Button } from "../../../ui/button.slint";
+import { ButtonState } from "../../../ui/interaction.slint";
+import { HyperlinkButton, HyperlinkButtonSurface } from "../../../ui/hyperlink-button.slint";
+import { OverlayArea } from "../../../ui/overlay-placement.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+export global UriLauncher { callback open(string) -> string; }
+export struct HyperlinkProbe {
+    bounds: OverlayArea, focused: bool, focus-visible: bool, state: ButtonState,
+    foreground: color, underline: bool,
+}
+
+export component HyperlinkButtonPage inherits FluentScrollView {
+    mouse-drag-pan-enabled: false;
+    in property <bool> active;
+    in property <length> target-size;
+    in-out property <bool> link-enabled: true;
+    in-out property <bool> long-label;
+    in-out property <bool> suppress-uri;
+    in-out property <string> navigate-uri: "https://www.microsoft.com";
+    out property <int> clicks;
+    out property <int> navigation-requests;
+    out property <string> status;
+    out property <HyperlinkProbe> probe: {
+        bounds: { x: external.absolute-position.x, y: external.absolute-position.y, width: external.width, height: external.height },
+        focused: external.has-focus, focus-visible: external.focus-visible, state: external.state,
+        foreground: external.foreground, underline: external.underline,
+    };
+    callback go-to-toggles;
+    public function focus-link() { external.focus(); }
+    public function leave-link() { following.focus(); }
+    public function focus-local-link() { local.focus(); }
+    content-height: max(root.height, content.preferred-height);
+    content := VerticalLayout {
+        x: 0px; y: 0px;
+        width: root.content-width;
+        height: self.preferred-height;
+        padding: FluentMetrics.spacing-medium;
+        spacing: FluentMetrics.spacing-large;
+        FluentText { text: "Open a link in your default browser."; wrap: word-wrap; }
+        HorizontalLayout {
+          alignment: start;
+          external := HyperlinkButton {
+            text: root.long-label ? "Open Microsoft home page to learn about products, services, and support" : "Microsoft home page";
+            wrap-text: true;
+            enabled: root.active && root.link-enabled;
+            minimum-target: root.target-size;
+            navigate-uri <=> root.navigate-uri;
+            clicked => { root.clicks += 1; if (root.suppress-uri) { self.navigate-uri = ""; } }
+            navigate-requested(uri) => {
+                root.navigation-requests += 1;
+                let error = UriLauncher.open(uri);
+                root.status = error == "" ? "Opened link" : error;
+            }
+          }
+        }
+        FluentText { text: "https://www.microsoft.com"; wrap: word-wrap; }
+        HorizontalLayout {
+          alignment: start;
+          local := HyperlinkButton {
+            text: "Go to ToggleButton";
+            enabled: root.active;
+            minimum-target: root.target-size;
+            clicked => { root.go-to-toggles(); }
+          }
+        }
+        FluentText { text: "Link activations: " + root.clicks; wrap: word-wrap; }
+        FluentText { text: root.status; visible: self.text != ""; wrap: word-wrap; }
+        following := Button {
+            text: root.link-enabled ? "Disable hyperlink button" : "Enable hyperlink button";
+            minimum-target: root.target-size;
+            clicked => { root.link-enabled = !root.link-enabled; }
+        }
+        Button { text: "Toggle long label"; minimum-target: root.target-size; clicked => { root.long-label = !root.long-label; } }
+        FluentText { text: "HyperlinkButton states"; font-weight: FluentMetrics.strong-weight; }
+        for item in [
+            { title: "Normal", state: ButtonState.normal, focused: false },
+            { title: "Pointer over", state: ButtonState.pointer-over, focused: false },
+            { title: "Pressed", state: ButtonState.pressed, focused: false },
+            { title: "Keyboard focus", state: ButtonState.normal, focused: true },
+            { title: "Disabled", state: ButtonState.disabled, focused: false },
+        ] : HorizontalLayout {
+            spacing: FluentMetrics.spacing-large;
+            FluentText { text: item.title; min-width: 100px * FluentTheme.ui-scale; wrap: word-wrap; }
+            HyperlinkButtonSurface { text: "Microsoft"; state: item.state; focus-visible: item.focused; wrap-text: true; minimum-target: root.target-size; }
+        }
+    }
+}

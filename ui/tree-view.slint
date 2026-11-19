@@ -1,0 +1,137 @@
+import { ItemAppearance, ItemData, ItemDecoration } from "item-presenter.slint";
+import { SelectableList } from "selectable-list.slint";
+import { SelectionModel, SelectionLogic } from "selection-model.slint";
+import { FluentMetrics } from "tokens.slint";
+
+export enum TreeSelectionMode { single, multiple, none }
+
+export struct TreeNode {
+    text: string,
+    parent-index: int,
+    disabled: bool,
+    icon: image,
+}
+
+export struct TreeProjection {
+    items: [ItemData],
+    indices: [int],
+    decorations: [ItemDecoration],
+    first-children: [int],
+}
+
+export struct TreeChecks {
+    checked: [int],
+    mixed: [int],
+}
+
+export global TreeLogic {
+    pure callback items([TreeNode], int) -> [ItemData];
+    pure callback project([TreeNode], [int], int) -> TreeProjection;
+    pure callback visible-selection([int], [int]) -> [int];
+    pure callback visible-ancestor([TreeNode], [int], int) -> int;
+    pure callback toggle-check([TreeNode], [int], int) -> TreeChecks;
+}
+
+export component TreeView inherits Rectangle {
+    in property <[TreeNode]> nodes;
+    in-out property <[int]> expanded;
+    in property <TreeSelectionMode> selection-mode;
+    in property <string> label: "Tree";
+    in property <bool> enabled: true;
+    in property <length> minimum-target;
+    out property <[int]> selected: root.selection-mode == TreeSelectionMode.multiple ? root.checks.checked
+        : root.selection-mode == TreeSelectionMode.single ? selection.selected : [];
+    out property <[int]> partially-selected: root.selection-mode == TreeSelectionMode.multiple ? root.checks.mixed : [];
+    out property <int> visible-count: root.projection.items.length;
+    out property <int> focused-index: list.focused-row >= 0 && list.focused-row < root.projection.indices.length
+        ? root.projection.indices[list.focused-row] : -1;
+    out property <length> row-height: list.row-height;
+    out property <length> scroll-offset: list.scroll-offset;
+    callback item-invoked(int);
+    callback branch-changed(int, bool);
+    callback selection-changed;
+    accessible-role: tree;
+    accessible-label: root.label;
+
+    property <int> node-count: root.nodes.length;
+    property <TreeProjection> projection: TreeLogic.project(root.nodes, root.expanded, root.node-count);
+    property <TreeChecks> checks;
+    changed nodes => { root.checks = {}; }
+    changed node-count => { root.checks = {}; }
+
+    selection := SelectionModel {
+        items: TreeLogic.items(root.nodes, root.node-count);
+        changed-by-user => { root.selection-changed(); }
+    }
+
+    public function set-expanded(index: int, open: bool) {
+        if (index >= 0 && index + 1 < root.node-count && root.nodes[index + 1].parent-index == index && SelectionLogic.contains(root.expanded, index) != open) {
+            let before = root.focused-index;
+            root.expanded = SelectionLogic.update(root.expanded, index, true);
+            if (before >= 0) {
+                list.focus-row(TreeLogic.visible-ancestor(root.nodes, root.projection.indices, before));
+            }
+            root.branch-changed(index, open);
+        }
+    }
+
+    public function set-selected-index(index: int) { selection.set-index(index); }
+
+    function request-check(index: int) {
+        root.checks = TreeLogic.toggle-check(root.nodes, root.checks.checked, index);
+        root.selection-changed();
+    }
+
+    list := SelectableList {
+        width: 100%;
+        height: 100%;
+        enabled: root.enabled;
+        framed: false;
+        preserve-position: true;
+        items: root.projection.items;
+        decorations: root.projection.decorations;
+        selected: TreeLogic.visible-selection(root.projection.indices, root.selected);
+        mixed-rows: TreeLogic.visible-selection(root.projection.indices, root.partially-selected);
+        show-checks: root.selection-mode == TreeSelectionMode.multiple;
+        row-height: max(root.minimum-target, FluentMetrics.tree-row-min-height);
+        item-appearance: ItemAppearance.tree;
+        label: root.label;
+
+        row-disclosure-clicked(row) => {
+            self.focus-row(row);
+            let index = root.projection.indices[row];
+            root.set-expanded(index, !root.projection.decorations[row].expanded);
+        }
+        row-check-clicked(row) => {
+            self.focus-row(row);
+            root.request-check(root.projection.indices[row]);
+        }
+        row-activated(row, from, control, shift, keyboard) => {
+            let index = root.projection.indices[row];
+            if (root.selection-mode == TreeSelectionMode.single) { selection.activate(index, false); }
+            root.item-invoked(index);
+        }
+        row-key-action(row, key) => {
+            let index = root.projection.indices[row];
+            let info = root.projection.decorations[row];
+            if (key == Key.RightArrow) {
+                if (!info.expanded && info.has-children) { root.set-expanded(index, true); }
+                else if (root.projection.first-children[row] >= 0) { self.focus-row(root.projection.first-children[row]); }
+                return true;
+            }
+            if (key == Key.LeftArrow) {
+                if (info.expanded) { root.set-expanded(index, false); }
+                else if (root.nodes[index].parent-index >= 0) {
+                    let parent = TreeLogic.visible-ancestor(root.nodes, root.projection.indices, root.nodes[index].parent-index);
+                    if (parent >= 0) { self.focus-row(parent); }
+                }
+                return true;
+            }
+            if (key == Key.Space && root.selection-mode == TreeSelectionMode.multiple) {
+                root.request-check(index);
+                return true;
+            }
+            return false;
+        }
+    }
+}

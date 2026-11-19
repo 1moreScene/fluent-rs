@@ -1,0 +1,47 @@
+import { OverlayArea, OverlayHost, OverlayPlacement } from "overlay-host.slint";
+import { FluentMetrics } from "tokens.slint";
+export { OverlayPlacement }
+
+// The caller focuses its anchor before opening and may let a child take initial focus.
+export component Flyout {
+    in property <OverlayArea> viewport;
+    in property <OverlayArea> anchor;
+    in property <OverlayPlacement> placement: OverlayPlacement.top;
+    in property <length> requested-width: FluentMetrics.flyout-min-width;
+    in property <length> requested-height: FluentMetrics.flyout-min-height;
+    in property <bool> active: true;
+    in property <bool> focus-content;
+    in property <bool> center-on-anchor: true;
+    in property <length> anchor-gap: FluentMetrics.spacing-medium;
+    in property <length> viewport-inset: FluentMetrics.spacing-medium;
+    in property <bool> theme-transition;
+    in property <bool> menu-presentation;
+    out property <bool> open: host.open;
+    out property <OverlayArea> panel-bounds: host.panel-bounds;
+
+    public function show() { host.show(); }
+    public function dismiss() { host.dismiss-with-transition(); }
+
+    host := OverlayHost {
+        area: root.viewport;
+        anchor: { x: root.anchor.x, y: root.anchor.y };
+        anchor-width: root.anchor.width;
+        anchor-height: root.anchor.height;
+        center-on-anchor: root.center-on-anchor;
+        anchor-gap: root.anchor-gap;
+        viewport-inset: root.viewport-inset;
+        flyout-transition: root.theme-transition && !root.menu-presentation;
+        portable-flyout-motion: root.theme-transition;
+        menu-transition: root.menu-presentation;
+        preferred-placement: root.placement;
+        preferred-panel-width: clamp(root.requested-width, FluentMetrics.flyout-min-width, FluentMetrics.flyout-max-width);
+        preferred-panel-height: clamp(root.requested-height,
+            root.menu-presentation ? FluentMetrics.menu-min-height : FluentMetrics.flyout-min-height,
+            FluentMetrics.flyout-max-height);
+        focus-scope-on-open: !root.focus-content;
+        active: root.active;
+        acrylic: true;
+        live-acrylic: root.theme-transition || root.menu-presentation;
+        @children
+    }
+}

@@ -1,0 +1,353 @@
+import { NavigationChevron } from "navigation-chevron.slint";
+import { InfoBadge } from "info-badge.slint";
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { NavigationIconKind, NavigationItemIcon } from "navigation-item-icon.slint";
+import { FluentFocus, FluentPressable } from "interaction.slint";
+import { ItemData } from "item-presenter.slint";
+import { FluentMotion } from "motion.slint";
+import { TopNavigationLayout } from "navigation-layout.slint";
+import { NavigationItemDetails, NavigationItemKind, NavigationRow, NavigationTree } from "navigation-tree.slint";
+import { OverlayArea } from "overlay-host.slint";
+import { NavigationIndicatorMotion } from "navigation-motion.slint";
+import { FluentFocusRing, FluentText } from "primitives.slint";
+import { FluentScrollView } from "scroll-view.slint";
+import { ListDirection, SelectionLogic } from "selection-model.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export component NavigationActionSurface inherits FluentPressable {
+    in property <bool> selected;
+    in property <bool> top-item;
+    in property <image> icon;
+    in property <string> label;
+    out property <bool> emphasized: root.enabled && FluentTheme.high-contrast && (root.selected || root.hovered);
+    out property <color> foreground: !root.enabled ? FluentTheme.text-disabled
+        : root.emphasized ? FluentTheme.contrast-highlight-text
+        : root.pressed ? FluentTheme.text-secondary : FluentTheme.text-primary;
+
+    focus-on-press: true;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if (root.enabled) { root.activated(); } }
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: FluentMetrics.control-radius;
+        background: root.emphasized ? FluentTheme.contrast-highlight
+            : root.top-item ? (root.selected ? transparent
+                : root.pressed ? FluentTheme.subtle-fill-pressed
+                : root.hovered ? FluentTheme.subtle-fill-hover : transparent)
+            : (root.selected && !root.hovered) || (!root.selected && root.hovered && !root.pressed)
+                || (root.selected && root.pressed) ? FluentTheme.subtle-fill-hover
+            : root.hovered || root.pressed ? FluentTheme.subtle-fill-pressed : transparent;
+
+        animate background {
+            duration: FluentMotion.control-fill-duration;
+            easing: FluentMotion.control-fill-easing;
+        }
+    }
+
+    @children
+
+    if root.focus-visible : FluentFocusRing { }
+}
+
+export component NavigationIconButton inherits NavigationActionSurface {
+    width: FluentMetrics.navigation-icon-slot;
+    height: FluentMetrics.navigation-item-height;
+    accessible-role: button;
+
+    FluentSystemIcon {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        source: root.icon;
+        foreground: root.foreground;
+    }
+}
+
+export component NavigationPane inherits FocusScope {
+    in property <[ItemData]> items;
+    in property <[image]> icons;
+    in property <[NavigationItemDetails]> details;
+    in property <[int]> expanded;
+    in property <int> root-parent: -1;
+    in property <[int]> indices: TopNavigationLayout.indices(0, root.items.length);
+    in property <bool> overflow-style;
+    in property <length> minimum-target;
+    in property <bool> show-labels;
+    in property <bool> section-open: true;
+    in property <float> label-opacity: 1;
+    in property <bool> selection-follows-focus;
+    in property <int> selected-index: -1;
+    out property <int> focused-index: -1;
+    out property <length> row-step: FluentMetrics.navigation-row-step(root.minimum-target);
+    out property <length> indicator-height: indicator.extent;
+    out property <length> extent: root.rows.length == 0 ? 0px
+        : root.rows[root.rows.length - 1].offset + root.rows[root.rows.length - 1].extent;
+    callback item-invoked(int, OverlayArea);
+    callback branch-toggled(int, OverlayArea);
+    callback item-focused(int);
+
+    property <int> tab-anchor: -1;
+    property <int> focus-request: -1;
+    property <float> section-opacity: root.section-open ? 1 : 0;
+    animate section-opacity {
+        enabled: FluentMotion.enabled;
+        delay: root.section-open ? FluentMotion.navigation-section-fade : 0ms;
+        duration: FluentMotion.navigation-section-fade;
+        easing: FluentMotion.navigation-inline-easing;
+    }
+    property <[ItemData]> visible-items: TopNavigationLayout.visible-items(root.items, root.indices);
+    property <[NavigationRow]> rows: NavigationTree.rows(root.details, root.indices, root.row-step,
+        FluentMetrics.navigation-section-height, FluentMetrics.navigation-separator-extent, root.root-parent);
+    property <int> selected-item: NavigationTree.ancestor(root.details, root.indices, root.selected-index);
+    property <int> selected-row: TopNavigationLayout.position(root.indices, root.selected-item);
+    property <int> anchor-row: TopNavigationLayout.position(root.indices, root.tab-anchor);
+    property <int> tab-target: root.anchor-row >= 0 ? root.anchor-row
+        : root.selected-row >= 0 ? root.selected-row : SelectionLogic.target(root.visible-items, -1, ListDirection.first);
+
+    accessible-role: list;
+    accessible-label: "Navigation";
+    accessible-item-count: root.indices.length;
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+
+    key-pressed(event) => {
+        if (root.focused-index < 0) { return reject; }
+        if (event.text != Key.UpArrow && event.text != Key.DownArrow && event.text != Key.Home && event.text != Key.End) { return reject; }
+        let direction = event.text == Key.UpArrow ? ListDirection.previous : event.text == Key.DownArrow ? ListDirection.next
+            : event.text == Key.Home ? ListDirection.first : ListDirection.last;
+        let row = SelectionLogic.target(root.visible-items, TopNavigationLayout.position(root.indices, root.focused-index), direction);
+        if (row >= 0 && root.indices[row] != root.focused-index) {
+            let target = root.indices[row];
+            FluentFocus.keyboard-input = true;
+            root.focus-request = target;
+            if (root.selection-follows-focus) { root.item-focused(target); }
+        }
+        return accept;
+    }
+
+    scroll := FluentScrollView {
+        width: 100%;
+        height: 100%;
+        content-height: max(self.height, root.extent);
+        vertical-scrollbar: root.show-labels && root.extent > self.height;
+        mouse-drag-pan-enabled: false;
+
+        // A branch must keep its AnimatedIcon and focus when its children become visible.
+        for item[source-index] in root.items : row-slot := Rectangle {
+            property <int> visible-row: TopNavigationLayout.position(root.indices, source-index);
+            property <NavigationRow> entry: self.visible-row >= 0 ? root.rows[self.visible-row] : {};
+            property <bool> destination: self.entry.details.kind == NavigationItemKind.destination;
+            x: self.entry.details.kind == NavigationItemKind.separator ? 0px : FluentMetrics.navigation-item-inset-x;
+            y: self.entry.offset + (self.destination ? FluentMetrics.navigation-item-inset-y : 0px);
+            width: max(0px, parent.width - 2 * self.x);
+            height: max(0px, self.entry.extent - (self.destination ? 2 * FluentMetrics.navigation-item-inset-y : 0px));
+
+            if row-slot.visible-row >= 0 : row-item := NavigationActionSurface {
+                property <int> visible-row: row-slot.visible-row;
+                property <NavigationRow> entry: row-slot.entry;
+                property <int> index: source-index;
+                property <bool> destination: row-slot.destination;
+                property <bool> has-icon: entry.details.icon-kind != NavigationIconKind.static-image || self.icon.width > 0;
+                property <bool> is-expanded: TopNavigationLayout.position(root.expanded, self.index) >= 0;
+                property <length> indent: entry.depth * FluentMetrics.navigation-indent;
+                property <OverlayArea> bounds: { x: self.absolute-position.x, y: self.absolute-position.y, width: self.width, height: self.height };
+                x: 0px;
+                y: 0px;
+                width: 100%;
+                height: 100%;
+                enabled: self.destination && !item.disabled;
+                icon: self.index < root.icons.length ? root.icons[self.index] : @image-url("");
+                selected: self.destination && self.index == root.selected-item;
+                label: item.text;
+                focus-on-tab-navigation: self.visible && self.visible-row == root.tab-target;
+                accessible-role: list-item;
+                accessible-expanded: entry.has-children && self.is-expanded;
+                accessible-item-index: self.visible-row;
+                accessible-item-selected: self.selected;
+
+                property <bool> requested: root.focus-request == self.index;
+                changed requested => { if (self.requested && self.enabled) { self.focus(); } }
+                focus-changed-event => {
+                    if (self.has-focus) {
+                        root.focused-index = self.index;
+                        root.tab-anchor = self.index;
+                        root.focus-request = -1;
+                        let top = entry.offset;
+                        let bottom = top + entry.extent;
+                        if (top < scroll.vertical-offset || bottom > scroll.vertical-offset + scroll.height) {
+                            scroll.scroll-to({ x: 0px, y: top < scroll.vertical-offset ? top : bottom - scroll.height }, ScrollBehavior.instant);
+                        }
+                    } else if (root.focused-index == self.index) {
+                        root.focused-index = -1;
+                    }
+                }
+                activated => { root.item-invoked(self.index, self.bounds); }
+                capture-key-pressed(event) => {
+                    if (entry.has-children && (event.text == Key.RightArrow || event.text == Key.LeftArrow)) {
+                        if (self.is-expanded != (event.text == Key.RightArrow)) { root.branch-toggled(self.index, self.bounds); }
+                        return accept;
+                    }
+                    return reject;
+                }
+                if entry.details.kind == NavigationItemKind.header : FluentText {
+                    x: FluentMetrics.navigation-section-left + parent.indent;
+                    y: 0px;
+                    width: max(0px, parent.width - self.x);
+                    height: 100%;
+                    text: entry.index < root.items.length ? root.items[entry.index].text : "";
+                    color: FluentTheme.text-secondary;
+                    font-weight: FluentMetrics.strong-weight;
+                    opacity: root.section-opacity;
+                    vertical-alignment: center;
+                }
+                if entry.details.kind == NavigationItemKind.separator : Rectangle {
+                    x: parent.indent;
+                    y: FluentMetrics.navigation-separator-before;
+                    width: max(0px, parent.width - self.x);
+                    height: FluentMetrics.control-stroke;
+                    background: FluentTheme.navigation-divider;
+                }
+
+                if self.destination && self.has-icon : NavigationItemIcon {
+                    x: parent.indent + (FluentMetrics.navigation-icon-slot - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    source: parent.icon;
+                    foreground: parent.foreground;
+                    kind: entry.details.icon-kind;
+                    hovered: parent.hovered;
+                    pressed: parent.pressed;
+                }
+                if self.destination && root.show-labels : FluentText {
+                    x: parent.indent + FluentMetrics.navigation-icon-slot + (parent.has-icon ? 0px : -FluentMetrics.spacing-large);
+                    width: max(0px, parent.width - self.x - FluentMetrics.spacing-medium
+                        - (entry.has-children ? FluentMetrics.navigation-icon-slot : 0px)
+                        - (entry.details.has-badge ? FluentMetrics.navigation-icon-slot : 0px));
+                    height: 100%;
+                    text: entry.index < root.items.length ? root.items[entry.index].text : "";
+                    color: parent.foreground;
+                    opacity: root.label-opacity;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+                if self.destination && entry.details.has-badge : InfoBadge {
+                    x: root.show-labels ? parent.width - self.width - FluentMetrics.spacing-medium
+                        - (entry.has-children ? FluentMetrics.navigation-icon-slot : 0px)
+                        : parent.width - self.width - FluentMetrics.navigation-item-inset-y;
+                    y: root.show-labels ? (parent.height - self.height) / 2 : FluentMetrics.navigation-item-inset-y;
+                    value: entry.details.badge-value;
+                }
+                if self.destination && entry.has-children && root.show-labels && !root.overflow-style : NavigationIconButton {
+                    x: parent.width - self.width;
+                    y: 0px;
+                    height: 100%;
+                    icon: @image-url("");
+                    label: parent.is-expanded ? "Collapse " + parent.label : "Expand " + parent.label;
+                    focus-on-tab-navigation: false;
+                    activated => { root.branch-toggled(entry.index, row-item.bounds); }
+                    NavigationChevron {
+                        expanded: row-item.is-expanded;
+                        hovered: row-item.hovered;
+                        pressed: row-item.pressed || parent.pressed;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        foreground: parent.foreground;
+                    }
+                }
+            }
+        }
+
+        if indicator.has-indicator : Rectangle {
+            x: FluentMetrics.navigation-item-inset-x;
+            y: indicator.top + (root.row-step - indicator.pill-height) / 2;
+            width: root.overflow-style ? FluentMetrics.navigation-overflow-pill-width : FluentMetrics.navigation-pill-width;
+            height: indicator.extent;
+            border-radius: FluentMetrics.navigation-pill-radius;
+            background: FluentTheme.navigation-selection;
+        }
+    }
+
+    indicator := NavigationIndicatorMotion {
+        index: root.selected-row;
+        position: root.selected-row >= 0 ? root.rows[root.selected-row].offset : 0px;
+        pill-height: root.overflow-style ? FluentMetrics.navigation-overflow-pill-height : FluentMetrics.navigation-pill-height;
+    }
+}
+
+export component NavigationPaneGroup inherits Rectangle {
+    slot pane-footer;
+    in property <[ItemData]> items;
+    in property <[image]> icons;
+    in property <[NavigationItemDetails]> details;
+    in property <[int]> expanded;
+    in property <int> footer-start: -1;
+    in property <length> minimum-target;
+    in property <bool> show-labels;
+    in property <bool> section-open: true;
+    in property <float> label-opacity: 1;
+    in property <bool> selection-follows-focus;
+    in property <int> selected-index: -1;
+    out property <int> focused-index: main.focused-index >= 0 ? main.focused-index : footer.focused-index;
+    out property <length> row-step: main.row-step;
+    out property <length> indicator-height: root.selected-index >= root.split && root.split < root.items.length
+        ? footer.indicator-height : main.indicator-height;
+    out property <Point> footer-origin: footer.absolute-position;
+    callback item-invoked(int, OverlayArea);
+    callback branch-toggled(int, OverlayArea);
+    callback item-focused(int);
+
+    property <int> split: root.footer-start >= 0 ? min(root.footer-start, root.items.length) : root.items.length;
+
+    main := NavigationPane {
+        x: 0px;
+        y: 0px;
+        width: 100%;
+        height: max(0px, custom-footer.y);
+        items: root.items;
+        indices: NavigationTree.visible(root.details, root.expanded, 0, root.split, -1, !root.show-labels);
+        icons: root.icons;
+        details: root.details;
+        expanded: root.expanded;
+        minimum-target: root.minimum-target;
+        show-labels: root.show-labels;
+        section-open: root.section-open;
+        label-opacity: root.label-opacity;
+        selected-index: root.selected-index;
+        selection-follows-focus: root.selection-follows-focus;
+        item-invoked(index, bounds) => { root.item-invoked(index, bounds); }
+        branch-toggled(index, bounds) => { root.branch-toggled(index, bounds); }
+        item-focused(index) => { root.item-focused(index); }
+    }
+
+    custom-footer := VerticalLayout {
+        x: 0px;
+        y: max(0px, footer.y - self.height - (self.height > 0px ? FluentMetrics.navigation-item-inset-x : 0px));
+        width: 100%;
+        height: min(footer.y, self.preferred-height);
+        pane-footer { }
+    }
+
+    footer := NavigationPane {
+        x: 0px;
+        y: root.height - self.height;
+        width: 100%;
+        height: min(root.height, self.extent);
+        visible: self.height > 0px;
+        items: root.items;
+        indices: NavigationTree.visible(root.details, root.expanded, root.split, root.items.length, -1, !root.show-labels);
+        icons: root.icons;
+        details: root.details;
+        expanded: root.expanded;
+        minimum-target: root.minimum-target;
+        show-labels: root.show-labels;
+        section-open: root.section-open;
+        label-opacity: root.label-opacity;
+        selected-index: root.selected-index;
+        selection-follows-focus: root.selection-follows-focus;
+        item-invoked(index, bounds) => { root.item-invoked(index, bounds); }
+        branch-toggled(index, bounds) => { root.branch-toggled(index, bounds); }
+        item-focused(index) => { root.item-focused(index); }
+    }
+}

@@ -1,0 +1,148 @@
+import { Button } from "../../../ui/button.slint";
+import { FluentSystemIcon } from "../../../ui/fluent-system-icon.slint";
+import { GridView, GridViewItem, ListSelectionMode } from "../../../ui/grid-view.slint";
+import { ItemData } from "../../../ui/item-presenter.slint";
+import { OverlayArea } from "../../../ui/overlay-placement.slint";
+import { PageHost } from "../../../ui/page-host.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+export struct GridViewProbe {
+    bounds: OverlayArea,
+    first: Point,
+    second: Point,
+    third: Point,
+    fourth: Point,
+    selected: [int],
+    focused: int,
+    offset: length,
+    extent: length,
+    lanes: int,
+    first-realized: int,
+    realized: int,
+    last-clicked: int,
+}
+
+export component GridViewPage inherits PageHost {
+    in property <bool> active;
+    in property <length> target-size;
+    in property <[ItemData]> large-items;
+    in-out property <bool> show-large;
+    in-out property <bool> scroll-horizontally;
+    in-out property <ListSelectionMode> selection-mode;
+    in property <[ItemData]> items: root.show-large ? root.large-items : [
+        { text: "Documents" },
+        { text: "Downloads" },
+        { text: "Unavailable", disabled: true },
+        { text: "Projects" },
+        { text: "Archives" },
+        { text: "Photos" },
+        { text: "Music" },
+        { text: "Settings" },
+        { text: "Shared" },
+    ];
+    property <int> last-clicked: -1;
+    out property <GridViewProbe> probe: {
+        bounds: { x: grid.absolute-position.x, y: grid.absolute-position.y, width: grid.width, height: grid.height },
+        first: root.item-center(0), second: root.item-center(1), third: root.item-center(2), fourth: root.item-center(3),
+        selected: grid.selected, focused: grid.focused-index, offset: grid.scroll-offset, extent: grid.scroll-extent,
+        lanes: grid.lane-count, first-realized: grid.first-realized-index, realized: grid.realized-count,
+        last-clicked: root.last-clicked,
+    };
+
+    public function scroll-to-index(index: int) { grid.scroll-to-index(index); }
+    public function set-selected-index(index: int) { grid.set-selected-index(index); }
+
+    pure function item-center(index: int) -> Point {
+        let bounds = grid.item-bounds(index);
+        return {
+            x: grid.absolute-position.x + bounds.x + bounds.width / 2 - (root.scroll-horizontally ? grid.scroll-offset : 0px),
+            y: grid.absolute-position.y + bounds.y + bounds.height / 2 - (root.scroll-horizontally ? 0px : grid.scroll-offset),
+        };
+    }
+
+    VerticalLayout {
+        padding: FluentMetrics.focus-outset;
+        spacing: FluentMetrics.spacing-medium;
+        FlexboxLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-small;
+            Button {
+                text: root.scroll-horizontally ? "Column-first" : "Row-first";
+                minimum-target: root.target-size;
+                clicked => { root.scroll-horizontally = !root.scroll-horizontally; }
+            }
+            Button {
+                text: root.selection-mode == ListSelectionMode.none ? "No selection"
+                    : root.selection-mode == ListSelectionMode.single ? "Single selection"
+                    : root.selection-mode == ListSelectionMode.multiple ? "Multiple selection" : "Extended selection";
+                minimum-target: root.target-size;
+                clicked => {
+                    root.selection-mode = root.selection-mode == ListSelectionMode.single ? ListSelectionMode.multiple
+                        : root.selection-mode == ListSelectionMode.multiple ? ListSelectionMode.extended
+                        : root.selection-mode == ListSelectionMode.extended ? ListSelectionMode.none : ListSelectionMode.single;
+                }
+            }
+            Button {
+                text: root.show-large ? "Small collection" : "100,000 items";
+                minimum-target: root.target-size;
+                clicked => { root.last-clicked = -1; root.show-large = !root.show-large; }
+            }
+        }
+
+        FluentText {
+            text: root.last-clicked < 0 ? "{grid.selected.length} selected"
+                : "{grid.selected.length} selected · {root.items[root.last-clicked].text}";
+            color: FluentTheme.text-secondary;
+            overflow: elide;
+        }
+
+        grid := GridView {
+            label: "Gallery grid";
+            use-default-item-template: false;
+            empty-text: "No items";
+            active: root.active;
+            items: root.items;
+            minimum-target: root.target-size;
+            item-click-enabled: true;
+            selection-mode: root.selection-mode;
+            orientation: root.scroll-horizontally ? Orientation.vertical : Orientation.horizontal;
+            maximum-rows-or-columns: 3;
+            item-width: 148px * FluentTheme.ui-scale;
+            item-height: 86px * FluentTheme.ui-scale;
+            item-clicked(index) => { root.last-clicked = index; }
+
+            item-template << Rectangle {
+                for slot-index in grid.realized-count : GridViewItem {
+                    cell: grid.cell-at(slot-index);
+                    activated(index, control, shift) => { grid.activate-item(index, control, shift); }
+                    selection-toggled(index) => { grid.toggle-item(index); }
+                    Rectangle {
+                        width: parent.width - 2 * FluentMetrics.spacing-small;
+                        height: parent.height - 2 * FluentMetrics.spacing-small;
+                        x: FluentMetrics.spacing-small;
+                        y: FluentMetrics.spacing-small;
+                        border-radius: FluentMetrics.control-radius;
+                        background: FluentTheme.card-fill-secondary;
+                    }
+                    FluentSystemIcon {
+                        x: (parent.width - self.width) / 2;
+                        y: FluentMetrics.spacing-large;
+                        source: @image-url("../../../ui/icons/fluent/folder-20-regular.svg");
+                        foreground: parent.foreground;
+                    }
+                    FluentText {
+                        x: FluentMetrics.spacing-medium;
+                        y: parent.height - 2 * self.preferred-height;
+                        width: parent.width - 2 * self.x;
+                        text: parent.cell.item.text;
+                        color: parent.foreground;
+                        horizontal-alignment: center;
+                        overflow: elide;
+                        accessible-role: none;
+                    }
+                }
+            }
+        }
+    }
+}

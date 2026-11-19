@@ -1,0 +1,107 @@
+import { ButtonState } from "interaction.slint";
+import { FluentMotion } from "motion.slint";
+import { FluentIcon, FluentSurface, FluentText } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export component ComboBoxSurface {
+    in property <string> text;
+    in property <bool> placeholder;
+    in property <ButtonState> state;
+    in property <bool> focus-visible;
+    in property <bool> arrow-only;
+    in property <bool> editor-focused;
+    in property <float> label-opacity: 1;
+    out property <length> glyph-offset: shift;
+
+    property <bool> disabled: root.state == ButtonState.disabled;
+    property <bool> hovered: root.state == ButtonState.pointer-over;
+    property <bool> pressed: root.state == ButtonState.pressed;
+    property <color> fill: FluentTheme.high-contrast
+        ? (root.hovered || root.pressed ? FluentTheme.contrast-highlight : FluentTheme.contrast-button-face)
+        : root.disabled ? FluentTheme.control-fill-disabled : root.pressed ? FluentTheme.control-fill-pressed
+        : root.hovered ? FluentTheme.control-fill-hover : FluentTheme.control-fill;
+    property <color> foreground: root.disabled ? FluentTheme.text-disabled
+        : FluentTheme.high-contrast && (root.hovered || root.pressed) ? FluentTheme.contrast-highlight-text
+        : root.placeholder || root.pressed ? FluentTheme.text-secondary : FluentTheme.text-primary;
+    property <length> shift: root.pressed && FluentMotion.enabled ? FluentMetrics.combo-chevron-size * 7.5 / 48 : 0px;
+    property <float> near: 100% * FluentMetrics.elevation-stop / max(1px, self.height);
+    property <float> far: 100% * FluentMetrics.elevation-depth / max(1px, self.height);
+    property <brush> stroke: FluentTheme.high-contrast
+        ? (root.disabled ? FluentTheme.contrast-disabled : FluentTheme.contrast-button-text)
+        : root.pressed || root.disabled ? FluentTheme.control-stroke
+        : FluentTheme.dark
+            ? @linear-gradient(180deg, FluentTheme.control-stroke-elevated near, FluentTheme.control-stroke far)
+            : @linear-gradient(180deg, FluentTheme.control-stroke 100% - far, FluentTheme.control-stroke-elevated 100% - near);
+
+    min-height: max(FluentMetrics.combo-min-height, FluentMetrics.scaled-font-size + FluentMetrics.button-padding-top + FluentMetrics.button-padding-bottom);
+
+    animate shift {
+        enabled: FluentMotion.enabled;
+        duration: root.pressed ? FluentMotion.combo-chevron-press : FluentMotion.combo-chevron-release;
+        easing: root.pressed ? FluentMotion.combo-chevron-press-easing : FluentMotion.combo-chevron-release-easing;
+    }
+
+    if root.focus-visible : FluentSurface {
+        x: -FluentMetrics.combo-focus-outset;
+        y: -FluentMetrics.combo-focus-outset;
+        width: parent.width + 2 * FluentMetrics.combo-focus-outset;
+        height: parent.height + 2 * FluentMetrics.combo-focus-outset;
+        border-radius: FluentMetrics.combo-focus-radius;
+        border-width: FluentMetrics.focus-outer-stroke;
+        border-color: FluentTheme.focus-outer;
+        background: FluentTheme.control-fill;
+    }
+
+    if !root.arrow-only : FluentSurface {
+        width: 100%;
+        height: 100%;
+        background: root.fill;
+        border-color: root.stroke;
+    }
+
+    if root.focus-visible : Rectangle {
+        x: FluentMetrics.control-stroke;
+        y: (parent.height - self.height) / 2;
+        width: FluentMetrics.combo-pill-width;
+        height: FluentMetrics.combo-pill-height;
+        border-radius: FluentMetrics.combo-pill-radius;
+        background: FluentTheme.high-contrast ? FluentTheme.contrast-highlight : FluentTheme.accent-fill;
+    }
+
+    if !root.arrow-only : FluentText {
+        x: FluentMetrics.combo-label-left;
+        width: max(0px, parent.width - self.x - FluentMetrics.combo-chevron-column);
+        height: parent.height;
+        text: root.text;
+        opacity: root.label-opacity;
+        color: root.foreground;
+        vertical-alignment: center;
+        overflow: elide;
+        accessible-role: none;
+    }
+
+    if root.arrow-only && (root.hovered || root.pressed) : Rectangle {
+        x: FluentMetrics.spacing-small;
+        y: FluentMetrics.spacing-small;
+        width: max(0px, parent.width - 2 * self.x);
+        height: max(0px, parent.height - 2 * self.y);
+        border-radius: FluentMetrics.control-radius;
+        background: FluentTheme.high-contrast ? FluentTheme.contrast-highlight
+            : root.pressed ? (root.editor-focused ? FluentTheme.control-alt-fill-pressed : FluentTheme.subtle-fill-pressed)
+            : FluentTheme.subtle-fill-hover;
+    }
+
+    FluentIcon {
+        width: FluentMetrics.combo-chevron-size;
+        height: self.width;
+        x: parent.width - self.width - FluentMetrics.combo-chevron-right;
+        y: (parent.height - self.height) / 2 + root.shift;
+        viewbox-width: 12;
+        viewbox-height: 12;
+        stroke: FluentTheme.high-contrast || root.disabled ? root.foreground : FluentTheme.text-secondary;
+        stroke-width: 1.5px;
+        MoveTo { x: 2; y: 4; }
+        LineTo { x: 6; y: 8; }
+        LineTo { x: 10; y: 4; }
+    }
+}

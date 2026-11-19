@@ -1,0 +1,8 @@
+import { OverlayArea } from "overlay-placement.slint";
+
+export struct ComboPopupGeometry { bounds: OverlayArea, first-row: int, last-row: int }
+
+export global ComboPopupLayout {
+    pure callback arrange(OverlayArea, OverlayArea, length, length, length, int, int) -> ComboPopupGeometry;
+    pure callback arrange-editable(OverlayArea, OverlayArea, length, length, length, int) -> ComboPopupGeometry;
+}

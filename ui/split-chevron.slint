@@ -1,0 +1,40 @@
+import { AnimatedIcon, AnimationMarker } from "animated-icon.slint";
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { FluentMotion } from "motion.slint";
+import { FluentMetrics } from "tokens.slint";
+
+export global SplitChevronMotion {
+    pure callback offset(float) -> float;
+}
+
+export component SplitChevron inherits AnimatedIcon {
+    in property <bool> hovered;
+    in property <bool> pressed;
+    width: FluentMetrics.small-chevron-size;
+    height: self.width;
+    state: root.pressed ? "Pressed" : root.hovered ? "PointerOver" : "Normal";
+    source-duration: FluentMotion.split-chevron-duration;
+    // AnimatedChevronDownSmallVisualSource::Markers in WinUI.
+    markers: [
+        { name: "NormalToPointerOver_Start", progress: 0 },
+        { name: "NormalToPointerOver_End", progress: 0 },
+        { name: "PointerOverToNormal_Start", progress: 0 },
+        { name: "PointerOverToNormal_End", progress: 0 },
+        { name: "NormalToPressed_Start", progress: 0 },
+        { name: "NormalToPressed_End", progress: 0.3120689655 },
+        { name: "PointerOverToPressed_Start", progress: 0 },
+        { name: "PointerOverToPressed_End", progress: 0.3120689655 },
+        { name: "PressedToNormal_Start", progress: 0.3465517241 },
+        { name: "PressedToNormal_End", progress: 0.9672413793 },
+        { name: "PressedToPointerOver_Start", progress: 0.3465517241 },
+        { name: "PressedToPointerOver_End", progress: 0.9672413793 },
+    ];
+
+    FluentSystemIcon {
+        width: 100%;
+        height: 100%;
+        y: SplitChevronMotion.offset(root.progress) * root.height;
+        source: @image-url("icons/fluent/chevron-down-12-regular.svg");
+        foreground: root.foreground;
+    }
+}

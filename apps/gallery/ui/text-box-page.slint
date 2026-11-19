@@ -1,9 +1,10 @@
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
 import { Button } from "../../../ui/button.slint";
-import { TextBox, TextBoxClearIcon, TextBoxState, TextBoxSurface } from "../../../ui/text-box.slint";
+import { TextBox, TextBoxClearSurface, TextBoxState, TextBoxSurface } from "../../../ui/text-box.slint";
 import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
 import { Caption } from "caption.slint";
 
-export component TextBoxPage inherits Flickable {
+export component TextBoxPage inherits FluentScrollView {
     in property <length> target-size;
     in-out property <bool> editing-enabled: true;
     in-out property <string> editable-text <=> editable.text;
@@ -24,13 +25,20 @@ export component TextBoxPage inherits Flickable {
     out property <bool> read-only-selection: read-only.has-selection;
     out property <length> multi-line-x: multi-line.absolute-position.x + multi-line.width / 2;
     out property <length> multi-line-y: multi-line.absolute-position.y + multi-line.height - FluentMetrics.text-box-min-height / 2;
+    out property <length> multi-line-right: multi-line.absolute-position.x + multi-line.width;
+    out property <length> multi-line-scroll-offset: multi-line.vertical-scroll-offset;
+    out property <Point> page-scroll-rail: {
+        x: root.absolute-position.x + root.width - FluentMetrics.scroll-bar-size / 2,
+        y: root.absolute-position.y + root.height / 4,
+    };
     out property <string> multi-line-text: multi-line.text;
 
-    content-width: self.width;
     content-height: max(self.height, page.preferred-height);
 
     page := VerticalLayout {
-        width: parent.width;
+        x: 0px;
+        y: 0px;
+        width: root.content-width;
         height: self.preferred-height;
         padding: FluentMetrics.spacing-small;
         spacing: FluentMetrics.spacing-large;
@@ -66,6 +74,7 @@ export component TextBoxPage inherits Flickable {
                 label: "Multiline";
                 placeholder-text: "Enter starts a new line";
                 multiline: true;
+                vertical-scrollbar: true;
                 preferred-height: FluentMetrics.text-box-min-height * 3;
                 minimum-target: root.target-size;
             }
@@ -104,9 +113,11 @@ export component TextBoxPage inherits Flickable {
                         overflow: elide;
                         accessible-role: none;
                     }
-                    if sample.state == TextBoxState.focused : TextBoxClearIcon {
-                        x: parent.width - (parent.height + FluentMetrics.text-box-clear-inset + self.width) / 2;
-                        y: (parent.height - self.height) / 2;
+                    if sample.state == TextBoxState.focused : TextBoxClearSurface {
+                        width: parent.height;
+                        height: parent.height;
+                        x: parent.width - self.width;
+                        y: 0px;
                     }
                 }
             }

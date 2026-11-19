@@ -1,0 +1,160 @@
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { Button } from "../../../ui/button.slint";
+import { ButtonState } from "../../../ui/interaction.slint";
+import { ComboBox } from "../../../ui/combo-box.slint";
+import { ItemData } from "../../../ui/item-presenter.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+import { Caption } from "caption.slint";
+
+export component ComboBoxPage {
+    in property <bool> active;
+    in property <length> target-size;
+    in property <OverlayArea> viewport;
+    in property <[ItemData]> long-items;
+    in property <bool> material-probe;
+    in-out property <bool> combo-enabled: true;
+    in-out property <bool> use-long-list;
+    in-out property <bool> empty;
+    out property <int> selected-index: workspace.selected-index;
+    out property <string> selected-text: workspace.selected-text;
+    out property <int> highlighted-index: workspace.highlighted-index;
+    out property <bool> open: workspace.open;
+    out property <bool> closing: workspace.closing;
+    out property <int> first-row: workspace.popup-first-row;
+    out property <bool> candidate-focus-visible: workspace.highlighted-focus-visible;
+    out property <bool> trigger-focused: workspace.trigger-focused;
+    out property <bool> keyboard-focus: workspace.focus-visible;
+    out property <bool> clear-focused: clear.has-focus;
+    out property <ButtonState> combo-state: workspace.state;
+    out property <length> glyph-offset: workspace.glyph-offset;
+    out property <OverlayArea> popup-bounds: workspace.popup-bounds;
+    out property <OverlayArea> trigger-bounds: {
+        x: workspace.absolute-position.x, y: workspace.absolute-position.y,
+        width: workspace.width, height: workspace.height,
+    };
+    out property <int> selection-edits;
+    out property <int> editable-selected-index: font-size.selected-index;
+    out property <string> editable-value: font-size.selected-text;
+    out property <string> editable-text: font-size.edit-text;
+    out property <bool> editable-focused: font-size.trigger-focused;
+    out property <bool> editable-open: font-size.open;
+    out property <int> editable-highlighted-index: font-size.highlighted-index;
+    out property <OverlayArea> editable-popup-bounds: font-size.popup-bounds;
+    out property <OverlayArea> editable-bounds: {
+        x: font-size.absolute-position.x, y: font-size.absolute-position.y,
+        width: font-size.width, height: font-size.height,
+    };
+
+    property <[ItemData]> workspaces: [
+        { text: "Workshop", disabled: false },
+        { text: "Studio", disabled: false },
+        { text: "Archive", disabled: true },
+        { text: "Field notes", disabled: false },
+        { text: "Print room", disabled: false },
+    ];
+
+    public function set-selected-index(index: int) { workspace.set-selected-index(index); }
+
+    if root.material-probe : Rectangle {
+        x: root.popup-bounds.x - root.absolute-position.x;
+        y: root.popup-bounds.y - root.absolute-position.y;
+        width: root.popup-bounds.width;
+        height: root.popup-bounds.height;
+        background: #000000;
+        Rectangle {
+            x: parent.width / 2;
+            width: parent.width / 2;
+            height: parent.height;
+            background: #ffffff;
+        }
+    }
+
+    examples-scroll := FluentScrollView {
+        width: 100%;
+        height: 100%;
+        content-height: max(self.height, examples.preferred-height);
+
+        examples := VerticalLayout {
+            x: 0px;
+            y: 0px;
+            width: examples-scroll.content-width;
+            height: self.preferred-height;
+            padding: FluentMetrics.combo-focus-outset;
+            spacing: FluentMetrics.spacing-medium;
+
+            Caption { text: "Workspace"; }
+            HorizontalLayout {
+                alignment: start;
+                workspace := ComboBox {
+                    label: "Workspace";
+                    placeholder: root.empty ? "No options" : "Choose a workspace";
+                    items: root.empty ? [] : root.use-long-list ? root.long-items : root.workspaces;
+                    preferred-width: min(320px * FluentTheme.ui-scale, max(0px, examples.width - 2 * FluentMetrics.combo-focus-outset));
+                    minimum-target: root.target-size;
+                    viewport: root.viewport;
+                    enabled: root.combo-enabled;
+                    active: root.active;
+                    selection-changed(index) => { root.selection-edits += 1; }
+                }
+            }
+            FlexboxLayout {
+                alignment: start;
+                spacing: FluentMetrics.spacing-medium;
+
+                clear := Button {
+                    text: "Clear selection";
+                    enabled: root.selected-index >= 0;
+                    minimum-target: root.target-size;
+                    clicked => { root.set-selected-index(-1); }
+                }
+                Button {
+                    text: root.combo-enabled ? "Disable" : "Enable";
+                    minimum-target: root.target-size;
+                    clicked => { root.combo-enabled = !root.combo-enabled; }
+                }
+                Button {
+                    text: root.use-long-list ? "Use workspaces" : "Use 100,000 records";
+                    minimum-target: root.target-size;
+                    clicked => { root.use-long-list = !root.use-long-list; }
+                }
+                Button {
+                    text: root.empty ? "Load options" : "Empty list";
+                    minimum-target: root.target-size;
+                    clicked => { root.empty = !root.empty; }
+                }
+            }
+            if root.selected-index >= 0 : FluentText { text: "Selected: " + root.selected-text; }
+
+            Caption { text: "Font size"; }
+            HorizontalLayout {
+                alignment: start;
+                font-size := ComboBox {
+                    editable: true;
+                    label: "Font size";
+                    placeholder: "Enter or choose a size";
+                    items: [
+                        { text: "8" }, { text: "9" }, { text: "10" }, { text: "11" }, { text: "12" },
+                        { text: "14" }, { text: "16" }, { text: "18" }, { text: "20" }, { text: "24" },
+                        { text: "28" }, { text: "36" }, { text: "48" }, { text: "72" },
+                    ];
+                    preferred-width: min(200px * FluentTheme.ui-scale, max(0px, examples.width - 2 * FluentMetrics.combo-focus-outset));
+                    minimum-target: root.target-size;
+                    viewport: root.viewport;
+                    enabled: root.combo-enabled;
+                    active: root.active;
+                    init => { self.set-selected-index(2); }
+                    text-submitted(value) => { return value.is-float() && value.to-float() >= 8 && value.to-float() < 100; }
+                }
+            }
+            FluentText {
+                text: "This preview uses the selected font size.";
+                font-size: font-size.selected-text.is-float()
+                    ? font-size.selected-text.to-float() * FluentTheme.ui-scale * FluentTheme.text-scale * 1px
+                    : FluentMetrics.scaled-font-size;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

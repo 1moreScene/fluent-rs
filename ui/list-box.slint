@@ -1,0 +1,62 @@
+import { ItemData } from "item-presenter.slint";
+import { SelectableList } from "selectable-list.slint";
+import { ListSelectionMode, SelectionModel } from "selection-model.slint";
+export { ListSelectionMode }
+
+export component ListBox {
+    in property <[ItemData]> items;
+    in property <string> label;
+    in property <string> empty-text: "No items";
+    in property <bool> enabled: true;
+    in property <length> minimum-target;
+    in property <ListSelectionMode> selection-mode;
+    in property <bool> single-selection-follows-focus: true;
+    out property <[int]> selected: selection.selected;
+    out property <int> selected-index: selection.selected-index;
+    out property <int> focused-row: view.focused-row;
+    out property <length> scroll-offset: view.scroll-offset;
+    out property <length> row-height: view.row-height;
+    callback selection-changed;
+
+    forward-focus: view;
+
+    selection := SelectionModel {
+        items: root.items;
+        mode: root.selection-mode;
+        changed-by-user => { root.selection-changed(); }
+    }
+
+    public function clear-selection() { selection.clear(); }
+    public function set-selected-index(index: int) { selection.set-index(index); }
+
+    view := SelectableList {
+        width: 100%;
+        height: 100%;
+        items: root.items;
+        label: root.label;
+        empty-text: root.empty-text;
+        enabled: root.enabled;
+        minimum-target: root.minimum-target;
+        selected: root.selected;
+        allow-select-all: root.selection-mode != ListSelectionMode.single;
+
+        row-activated(index, from, control, shift, keyboard) => {
+            if (shift && root.selection-mode == ListSelectionMode.extended) {
+                selection.extend(index, from, control);
+            } else {
+                selection.activate(index, control || root.selection-mode == ListSelectionMode.multiple);
+            }
+        }
+
+        row-navigated(index, from, control, shift) => {
+            if (shift && root.selection-mode == ListSelectionMode.extended) {
+                selection.extend(index, from, control);
+            } else if (!control && (root.selection-mode == ListSelectionMode.extended
+                || (root.selection-mode == ListSelectionMode.single && root.single-selection-follows-focus))) {
+                selection.activate(index, false);
+            }
+        }
+
+        select-all-requested => { selection.toggle-all(); }
+    }
+}

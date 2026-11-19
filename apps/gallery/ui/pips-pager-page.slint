@@ -1,0 +1,110 @@
+import { Button } from "../../../ui/button.slint";
+import { ComboBox } from "../../../ui/combo-box.slint";
+import { OverlayArea } from "../../../ui/overlay-placement.slint";
+import { PageHost } from "../../../ui/page-host.slint";
+import { PipsPager, PipsPagerButtonVisibility } from "../../../ui/pips-pager.slint";
+import { FluentSurface, FluentText } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { FluentMetrics } from "../../../ui/tokens.slint";
+export { PipsPagerButtonVisibility }
+
+export struct PipsPagerProbe {
+    bounds: OverlayArea,
+    previous: OverlayArea,
+    next: OverlayArea,
+    previous-shown: bool,
+    next-shown: bool,
+    first: int,
+    visible-count: int,
+    selected: int,
+    focused: int,
+    selected-center: Point,
+}
+
+export component PipsPagerPage inherits PageHost {
+    in property <bool> active;
+    in property <length> target-size;
+    in property <OverlayArea> viewport;
+    in-out property <int> page-index <=> pager.page-index;
+    in-out property <int> page-count: 10;
+    in-out property <bool> vertical;
+    in-out property <bool> wrap-pages;
+    in-out property <bool> pager-enabled: true;
+    in-out property <PipsPagerButtonVisibility> arrow-mode: PipsPagerButtonVisibility.visible;
+    out property <PipsPagerProbe> probe: {
+        bounds: { x: pager.absolute-position.x, y: pager.absolute-position.y, width: pager.width, height: pager.height },
+        previous: pager.previous-bounds, next: pager.next-bounds,
+        previous-shown: pager.previous-shown, next-shown: pager.next-shown,
+        first: pager.first-visible-index, visible-count: pager.visible-count, selected: pager.selected-index,
+        focused: pager.focused-index, selected-center: pager.pip-center(pager.selected-index),
+    };
+
+    FluentScrollView {
+        width: 100%;
+        height: 100%;
+        content-height: max(self.height, examples.preferred-height);
+        mouse-drag-pan-enabled: false;
+
+        examples := VerticalLayout {
+            alignment: start;
+            padding: FluentMetrics.focus-outset;
+            spacing: FluentMetrics.spacing-large;
+
+            FluentSurface {
+                height: description.preferred-height + 2 * FluentMetrics.spacing-large;
+                description := FluentText {
+                    x: FluentMetrics.spacing-large;
+                    y: FluentMetrics.spacing-large;
+                    width: max(0px, parent.width - 2 * self.x);
+                    text: pager.selected-index < 0 ? "No pages"
+                        : root.page-count < 0 ? "Page " + (pager.selected-index + 1)
+                        : "Page " + (pager.selected-index + 1) + " of " + root.page-count;
+                    wrap: word-wrap;
+                }
+            }
+
+            pager := PipsPager {
+                width: min(self.preferred-width, max(0px, examples.width - 2 * examples.padding));
+                height: self.preferred-height;
+                number-of-pages: root.page-count;
+                enabled: root.pager-enabled;
+                orientation: root.vertical ? Orientation.vertical : Orientation.horizontal;
+                previous-button-visibility: root.arrow-mode;
+                next-button-visibility: root.arrow-mode;
+                wrap-pages: root.wrap-pages;
+                active: root.active;
+                minimum-target: root.target-size;
+                viewport: root.viewport;
+            }
+
+            FlexboxLayout {
+                alignment: start;
+                spacing: FluentMetrics.spacing-medium;
+                Button {
+                    text: root.vertical ? "Use horizontal" : "Use vertical";
+                    minimum-target: root.target-size;
+                    enabled: root.active;
+                    clicked => { root.vertical = !root.vertical; }
+                }
+                Button {
+                    text: root.wrap-pages ? "Turn wrap off" : "Turn wrap on";
+                    minimum-target: root.target-size;
+                    enabled: root.active;
+                    clicked => { root.wrap-pages = !root.wrap-pages; }
+                }
+                ComboBox {
+                    label: "Arrow visibility";
+                    items: [{ text: "Visible" }, { text: "On pointer over" }, { text: "Collapsed" }];
+                    active: root.active;
+                    minimum-target: root.target-size;
+                    viewport: root.viewport;
+                    init => { self.set-selected-index(0); }
+                    selection-changed(index) => {
+                        root.arrow-mode = index == 0 ? PipsPagerButtonVisibility.visible
+                            : index == 1 ? PipsPagerButtonVisibility.visible-on-pointer-over : PipsPagerButtonVisibility.collapsed;
+                    }
+                }
+            }
+        }
+    }
+}

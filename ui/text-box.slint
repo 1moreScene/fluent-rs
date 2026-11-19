@@ -1,29 +1,60 @@
 import { FluentMetrics, FluentTheme } from "tokens.slint";
 import { FluentPointerArea } from "interaction.slint";
 import { FluentIcon, FluentSurface, FluentText } from "primitives.slint";
+import { FluentScrollBar } from "scroll-bar.slint";
 
 export enum TextBoxState { normal, pointer-over, focused, disabled }
 
-// A project-drawn clear mark shared with the Gallery's focused sample.
-export component TextBoxClearIcon inherits FluentIcon {
-    width: FluentMetrics.text-box-clear-icon-size;
-    height: FluentMetrics.text-box-clear-icon-size;
-    viewbox-width: 12;
-    viewbox-height: 12;
-    commands: "M 2 2 L 10 10 M 10 2 L 2 10";
-    stroke: FluentTheme.text-secondary;
-    stroke-line-cap: round;
+// This surface occupies the trailing button column in both TextBox and Gallery.
+export component TextBoxActionSurface inherits Rectangle {
+    in property <bool> hovered;
+    in property <bool> pressed;
+    in property <length> right-inset: FluentMetrics.text-box-clear-inset;
+    in property <length> vertical-inset: FluentMetrics.text-box-clear-inset;
+    out property <length> action-content-width: max(0px, root.width - root.right-inset);
+    out property <length> action-content-height: max(0px, root.height - 2 * root.vertical-inset);
+
+    Rectangle {
+        x: 0px;
+        y: root.vertical-inset;
+        width: root.action-content-width;
+        height: root.action-content-height;
+        border-radius: FluentMetrics.control-radius;
+        background: FluentTheme.high-contrast && root.hovered ? FluentTheme.contrast-highlight
+            : root.pressed ? FluentTheme.subtle-fill-pressed : root.hovered ? FluentTheme.subtle-fill-hover : #0000;
+
+        @children
+    }
+}
+
+export component TextBoxClearSurface inherits TextBoxActionSurface {
+    FluentIcon {
+        x: (root.action-content-width - self.width) / 2;
+        y: (root.action-content-height - self.height) / 2;
+        width: FluentMetrics.text-box-clear-icon-size;
+        height: self.width;
+        viewbox-width: 12;
+        viewbox-height: 12;
+        commands: "M 2 2 L 10 10 M 10 2 L 2 10";
+        stroke: FluentTheme.high-contrast && root.hovered ? FluentTheme.contrast-highlight-text
+            : root.pressed ? FluentTheme.text-tertiary : FluentTheme.text-secondary;
+        stroke-line-cap: round;
+    }
 }
 
 // The live control and the Gallery samples use the same chrome.
 export component TextBoxSurface {
     in property <TextBoxState> state;
+    in property <bool> square-top;
+    in property <bool> square-bottom;
     out property <color> foreground: state == TextBoxState.disabled ? FluentTheme.input-disabled-text : FluentTheme.text-primary;
     out property <color> placeholder-color: state == TextBoxState.disabled ? FluentTheme.text-disabled : FluentTheme.text-secondary;
 
     property <bool> focused: state == TextBoxState.focused;
     property <length> stroke: FluentMetrics.control-stroke;
     property <length> radius: FluentMetrics.control-radius;
+    property <length> top-radius: root.square-top ? 0px : root.radius;
+    property <length> bottom-radius: root.square-bottom ? 0px : root.radius;
     out property <length> bottom-stroke: focused ? FluentMetrics.text-box-focus-stroke : stroke;
     property <float> gradient-start: 100% - 100% * FluentMetrics.text-box-elevation-depth / max(1px, self.height);
     property <float> gradient-end: 100% - 100% * FluentMetrics.elevation-stop / max(1px, self.height);
@@ -49,20 +80,29 @@ export component TextBoxSurface {
         width: max(0px, root.width - 2 * root.stroke);
         height: max(0px, root.height - root.stroke - root.bottom-stroke);
         background: root.fill();
-        border-radius: root.radius - root.stroke;
+        border-top-left-radius: max(0px, root.top-radius - root.stroke);
+        border-top-right-radius: self.border-top-left-radius;
+        border-bottom-left-radius: max(0px, root.bottom-radius - root.stroke);
+        border-bottom-right-radius: self.border-bottom-left-radius;
     }
     FluentSurface {
         width: 100%;
         height: 100%;
         background: transparent;
-        border-radius: root.radius;
+        border-top-left-radius: root.top-radius;
+        border-top-right-radius: root.top-radius;
+        border-bottom-left-radius: root.bottom-radius;
+        border-bottom-right-radius: root.bottom-radius;
         border-width: root.focused && FluentTheme.high-contrast ? FluentMetrics.text-box-focus-stroke : root.stroke;
         border-color: root.outline();
     }
     if root.focused && !FluentTheme.high-contrast : Rectangle {
         width: 100%;
         height: 100%;
-        border-radius: root.radius;
+        border-top-left-radius: root.top-radius;
+        border-top-right-radius: root.top-radius;
+        border-bottom-left-radius: root.bottom-radius;
+        border-bottom-right-radius: root.bottom-radius;
         clip: true;
         Rectangle {
             y: parent.height - self.height;
@@ -75,6 +115,13 @@ export component TextBoxSurface {
 }
 
 export component TextBox inherits VerticalLayout {
+    // Expose the composite once. Slint forwards its text runs and editing actions
+    // to the native TextInput; consumers such as NumberBox can own the outer role.
+    accessible-role: text-input;
+    accessible-label: root.accessible-name;
+    accessible-placeholder-text: root.placeholder-text;
+    accessible-value: root.sensitive-input ? "" : root.text;
+    accessible-enabled: root.enabled;
     in-out property <string> text <=> editor.text;
     in property <string> label;
     in property <string> placeholder-text;
@@ -82,20 +129,45 @@ export component TextBox inherits VerticalLayout {
     in property <bool> enabled: true;
     in property <bool> read-only;
     in property <bool> multiline;
+    in property <InputType> input-type: InputType.text;
+    in property <bool> sensitive-input;
+    in property <string> editor-font-family;
+    in property <color> editor-foreground: surface.foreground;
+    in property <string> editor-measure-font-family: root.sensitive-input ? "" : root.editor-font-family;
+    in property <bool> vertical-scrollbar;
     in property <length> minimum-target;
+    in property <length> trailing-inset: FluentMetrics.text-box-padding-right + FluentMetrics.control-stroke;
+    in property <bool> show-clear-button: true;
+    in property <length> clear-button-width;
+    in property <length> clear-button-offset;
+    in property <bool> square-top;
+    in property <bool> square-bottom;
 
     out property <bool> has-focus: self.enabled && editor.has-focus;
     out property <bool> has-selection: self.enabled && editor.has-selection;
-    out property <bool> clear-button-visible: self.has-focus && !read-only && !multiline && text != ""
+    out property <string> preedit-text: editor.preedit-text;
+    out property <int> cursor-byte-offset: editor.cursor-position-byte-offset;
+    out property <length> horizontal-scroll-offset: min(viewport.scroll-x, viewport.horizontal-limit);
+    out property <length> vertical-scroll-offset: min(viewport.scroll-y, viewport.vertical-limit);
+    out property <bool> clear-button-visible: root.show-clear-button && self.has-focus && !read-only && !multiline && text != ""
         && surface.width > max(FluentMetrics.text-box-clear-min-width-em * editor.font-size,
-            surface.height + self.editor-horizontal-insets);
+            root.actual-clear-width + self.editor-horizontal-insets);
     out property <TextBoxState> state: !self.enabled ? TextBoxState.disabled
         : self.has-focus ? TextBoxState.focused
         : pointer.pointer-inside ? TextBoxState.pointer-over : TextBoxState.normal;
     callback edited(text: string);
     callback accepted(text: string);
-    property <length> editor-horizontal-insets: FluentMetrics.text-box-padding-left
-        + FluentMetrics.text-box-padding-right + 2 * FluentMetrics.control-stroke;
+    callback scrolled(PointerScrollEvent) -> EventResult;
+    scrolled(event) => { return reject; }
+    property <length> editor-horizontal-insets: FluentMetrics.text-box-padding-left + FluentMetrics.control-stroke
+        + root.trailing-inset + (root.multiline && root.vertical-scrollbar ? FluentMetrics.scroll-bar-size : 0px);
+    property <length> actual-clear-width: root.clear-button-width > 0px ? root.clear-button-width : surface.height;
+
+    public function set-selection-offsets(anchor: int, cursor: int) {
+        editor.set-selection-offsets(anchor, cursor);
+    }
+    public function select-all() { editor.select-all(); }
+    public function clear-input-focus() { editor.clear-focus(); }
 
     function clear-text() {
         if (root.clear-button-visible) {
@@ -126,22 +198,38 @@ export component TextBox inherits VerticalLayout {
 
     surface := TextBoxSurface {
         min-height: max(root.minimum-target, FluentMetrics.text-box-min-height,
-            editor.font-metrics.ascent + abs(editor.font-metrics.descent) +
+            typography.font-metrics.ascent + abs(typography.font-metrics.descent) +
             FluentMetrics.text-box-padding-top + FluentMetrics.text-box-padding-bottom + 2 * FluentMetrics.control-stroke);
         vertical-stretch: root.multiline ? 1 : 0;
         state: root.state;
+        square-top: root.square-top;
+        square-bottom: root.square-bottom;
+
+        // Keep the edit frame stable when a password switches its mask typeface.
+        typography := FluentText {
+            x: 0px;
+            y: 0px;
+            width: 0px;
+            height: 0px;
+            visible: false;
+            font-family: root.editor-measure-font-family;
+            font-size: FluentMetrics.body-size;
+            font-weight: FluentMetrics.regular-weight;
+            accessible-role: none;
+        }
 
         pointer := FluentPointerArea {
             width: 100%;
             height: 100%;
             enabled: root.enabled;
             mouse-cursor: MouseCursor.text;
-            pointer-event(event) => {
+            interaction-event(event) => {
                 if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
                     editor.focus();
                 }
             }
             scroll-event(event) => {
+                if (!root.multiline) { return root.scrolled(event); }
                 let next = clamp(viewport.scroll-y - event.delta-y, 0px, viewport.vertical-limit);
                 if (!root.multiline || next == viewport.scroll-y) { return reject; }
                 viewport.scroll-y = next;
@@ -153,7 +241,7 @@ export component TextBox inherits VerticalLayout {
                 x: FluentMetrics.text-box-padding-left + FluentMetrics.control-stroke;
                 y: FluentMetrics.text-box-padding-top + FluentMetrics.control-stroke;
                 width: max(1px, parent.width - root.editor-horizontal-insets
-                    - (root.clear-button-visible ? surface.height : 0px));
+                    - (root.clear-button-visible ? root.actual-clear-width : 0px));
                 height: max(1px, parent.height - self.y - surface.bottom-stroke - FluentMetrics.text-box-padding-bottom);
                 property <length> scroll-x;
                 property <length> scroll-y;
@@ -179,17 +267,27 @@ export component TextBox inherits VerticalLayout {
                     page-height: viewport.height;
                     vertical-alignment: root.multiline ? top : center;
                     single-line: !root.multiline;
+                    input-type: root.input-type;
+                    input-method-hints: { capitalization: root.sensitive-input ? CapitalizationMode.none : CapitalizationMode.sentences,
+                        auto-correct: !root.sensitive-input, auto-complete: !root.sensitive-input };
                     wrap: root.multiline ? word-wrap : no-wrap;
                     enabled: root.enabled;
                     read-only: root.read-only;
                     font-size: FluentMetrics.body-size;
+                    font-family: root.editor-font-family;
                     font-weight: FluentMetrics.regular-weight;
-                    color: surface.foreground;
+                    color: root.editor-foreground;
                     selection-background-color: FluentTheme.high-contrast ? FluentTheme.contrast-highlight : FluentTheme.accent-fill;
                     selection-foreground-color: FluentTheme.high-contrast ? FluentTheme.contrast-highlight-text : FluentTheme.accent-text;
                     text-cursor-width: FluentMetrics.text-cursor-width;
-                    accessible-label: root.accessible-name;
-                    accessible-placeholder-text: root.placeholder-text;
+                    accessible-role: none;
+
+                    key-pressed(event) => {
+                        if (root.sensitive-input && (((event.modifiers.control || event.modifiers.meta)
+                            && (event.text == "c" || event.text == "C" || event.text == "x" || event.text == "X" || event.text == Key.Insert))
+                            || (event.modifiers.shift && event.text == Key.Delete))) { return accept; }
+                        return reject;
+                    }
 
                     edited => { root.edited(self.text); }
                     accepted => { if (!root.read-only) { root.accepted(self.text); } }
@@ -208,9 +306,23 @@ export component TextBox inherits VerticalLayout {
             }
         }
 
+        if root.multiline && root.vertical-scrollbar : FluentScrollBar {
+            x: max(0px, parent.width - FluentMetrics.control-stroke - self.width);
+            y: FluentMetrics.control-stroke;
+            height: max(0px, parent.height - self.y - surface.bottom-stroke);
+            extent: editor.height;
+            viewport-size: viewport.height;
+            offset: root.vertical-scroll-offset;
+            handles-wheel: true;
+            enabled: root.enabled;
+            line-step: editor.font-metrics.ascent + abs(editor.font-metrics.descent);
+            offset-requested(y) => { viewport.scroll-y = y; }
+        }
+
         if root.clear-button-visible : clear-button := FluentPointerArea {
-            x: parent.width - self.width;
-            width: parent.height;
+            x: parent.width - self.width - root.clear-button-offset;
+            y: 0px;
+            width: root.actual-clear-width;
             height: 100%;
             mouse-cursor: MouseCursor.default;
             accessible-role: button;
@@ -218,21 +330,11 @@ export component TextBox inherits VerticalLayout {
             accessible-action-default => { root.clear-text(); }
             clicked => { root.clear-text(); }
 
-            Rectangle {
-                y: FluentMetrics.text-box-clear-inset;
-                width: max(0px, parent.width - FluentMetrics.text-box-clear-inset);
-                height: max(0px, parent.height - 2 * self.y);
-                border-radius: FluentMetrics.control-radius;
-                background: FluentTheme.high-contrast && clear-button.pointer-inside ? FluentTheme.contrast-highlight
-                    : clear-button.pressed-inside ? FluentTheme.subtle-fill-pressed
-                    : clear-button.pointer-inside ? FluentTheme.subtle-fill-hover : #0000;
-
-                TextBoxClearIcon {
-                    x: (parent.width - self.width) / 2;
-                    y: (parent.height - self.height) / 2;
-                    stroke: FluentTheme.high-contrast && clear-button.pointer-inside ? FluentTheme.contrast-highlight-text
-                        : clear-button.pressed-inside ? FluentTheme.text-tertiary : FluentTheme.text-secondary;
-                }
+            TextBoxClearSurface {
+                width: 100%;
+                height: 100%;
+                hovered: clear-button.pointer-inside;
+                pressed: clear-button.pressed-inside;
             }
         }
     }

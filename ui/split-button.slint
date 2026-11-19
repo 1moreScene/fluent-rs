@@ -1,0 +1,314 @@
+import { Flyout, OverlayPlacement } from "flyout.slint";
+import { ButtonState, FluentFocus, FluentPointerArea, FluentPressable } from "interaction.slint";
+import { OverlayArea } from "overlay-host.slint";
+import { FluentFocusRing, FluentSurface, FluentText } from "primitives.slint";
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { SplitChevron } from "split-chevron.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+component SplitOutline inherits Rectangle {
+    in property <brush> stroke;
+    in property <bool> trailing;
+    clip: true;
+
+    FluentSurface {
+        x: root.trailing ? -FluentMetrics.control-radius : 0px;
+        y: 0px;
+        width: parent.width + FluentMetrics.control-radius;
+        height: parent.height;
+        background: transparent;
+        border-color: root.stroke;
+    }
+}
+
+export component SplitButton inherits FocusScope {
+    slot primary-content;
+    in property <string> text;
+    in property <image> icon;
+    in property <string> accessible-name: root.text;
+    in property <bool> active: true;
+    in property <length> minimum-target;
+    in property <length> horizontal-padding: FluentMetrics.button-padding-horizontal;
+    in property <length> top-padding: FluentMetrics.split-button-padding-top;
+    in property <length> bottom-padding: FluentMetrics.split-button-padding-bottom;
+    in property <OverlayArea> viewport;
+    in property <length> flyout-width: FluentMetrics.flyout-min-width;
+    in property <length> flyout-height: FluentMetrics.flyout-min-height;
+    in property <bool> focus-flyout-content;
+    out property <bool> open: flyout.open;
+    out property <OverlayArea> bounds: { x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height };
+    out property <OverlayArea> panel-bounds: flyout.panel-bounds;
+    out property <bool> button-focused: primary.has-focus;
+    out property <ButtonState> primary-state: root.part-state(primary.hovered, primary.pressed);
+    out property <color> primary-foreground: root.ink(root.primary-state, false);
+    out property <ButtonState> secondary-state: root.part-state(secondary.pointer-inside, secondary.pressed-inside);
+    out property <float> chevron-progress: arrow.progress;
+    out property <Point> primary-center: {
+        x: primary.absolute-position.x + primary.width / 2,
+        y: primary.absolute-position.y + primary.height / 2,
+    };
+    out property <Point> secondary-center: {
+        x: secondary.absolute-position.x + secondary.width / 2,
+        y: secondary.absolute-position.y + secondary.height / 2,
+    };
+    callback clicked;
+
+    property <length> divider: FluentMetrics.control-stroke;
+    property <length> secondary-width: max(FluentMetrics.split-button-part-width, root.minimum-target);
+    property <length> split: max(0px, self.width - root.secondary-width - root.divider);
+    property <length> radius: FluentMetrics.control-radius;
+    property <bool> operable: root.enabled && root.active;
+    property <bool> touch-input;
+    in property <bool> toggleable;
+    in-out property <bool> checked-state;
+    property <bool> show-checked: root.operable && root.toggleable && root.checked-state;
+    property <bool> whole-pressed: root.open || (primary.pressed && (FluentFocus.keyboard-input || root.touch-input))
+        || (root.touch-input && secondary.pressed-inside);
+    property <color> edge: FluentTheme.control-stroke;
+    property <float> elevation-start: 100% * FluentMetrics.elevation-stop / max(1px, self.height);
+    property <float> elevation-end: 100% * FluentMetrics.elevation-depth / max(1px, self.height);
+    property <float> bottom-start: 100% - root.elevation-end;
+    property <float> bottom-end: 100% - root.elevation-start;
+    property <brush> elevated-edge: FluentTheme.dark
+        ? @linear-gradient(180deg, FluentTheme.control-stroke-elevated elevation-start, root.edge elevation-end)
+        : @linear-gradient(180deg, root.edge bottom-start, FluentTheme.control-stroke-elevated bottom-end);
+
+    property <brush> checked-edge: @linear-gradient(180deg,
+        FluentTheme.accent-stroke bottom-start, FluentTheme.accent-stroke-elevated bottom-end);
+
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+    min-width: max(root.minimum-target, FluentMetrics.split-button-part-width) + root.secondary-width + root.divider;
+    min-height: max(root.minimum-target, primary-layout.preferred-height);
+    preferred-width: max(self.min-width, primary-layout.preferred-width + root.secondary-width + root.divider);
+    preferred-height: self.min-height;
+    max-width: self.preferred-width;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    public function open-flyout() {
+        if (root.operable && !root.open) {
+            primary.focus();
+            flyout.show();
+        }
+    }
+
+    public function dismiss-flyout() { flyout.dismiss(); }
+    changed open => {
+        if (!root.open && root.operable) { primary.focus(); }
+    }
+
+    pure function part-state(hovered: bool, pressed: bool) -> ButtonState {
+        if (!root.operable) { return ButtonState.disabled; }
+        if (root.whole-pressed || pressed) { return ButtonState.pressed; }
+        if (hovered && !root.touch-input) { return ButtonState.pointer-over; }
+        return ButtonState.normal;
+    }
+
+    function activate-primary() {
+        if (root.operable) {
+            if (root.toggleable) { root.checked-state = !root.checked-state; }
+            root.clicked();
+        }
+    }
+
+    pure function fill(state: ButtonState) -> color {
+        if (state == ButtonState.disabled) { return transparent; }
+        if (root.show-checked) {
+            if (FluentTheme.high-contrast) {
+                return state == ButtonState.pressed ? FluentTheme.contrast-button-face
+                    : state == ButtonState.pointer-over ? FluentTheme.contrast-button-text : FluentTheme.contrast-highlight;
+            }
+            return state == ButtonState.pressed ? FluentTheme.accent-fill-pressed
+                : state == ButtonState.pointer-over ? FluentTheme.accent-fill-hover : FluentTheme.accent-fill;
+        }
+        if (FluentTheme.high-contrast) {
+            return state == ButtonState.normal ? FluentTheme.contrast-surface : FluentTheme.contrast-highlight-text;
+        }
+        return state == ButtonState.pressed ? FluentTheme.control-fill-pressed
+            : state == ButtonState.pointer-over ? FluentTheme.control-fill-hover : FluentTheme.control-fill;
+    }
+
+    pure function ink(state: ButtonState, indicator: bool) -> color {
+        if (state == ButtonState.disabled) { return FluentTheme.text-disabled; }
+        if (root.show-checked) {
+            if (FluentTheme.high-contrast) {
+                return state == ButtonState.pressed ? FluentTheme.contrast-button-text
+                    : state == ButtonState.pointer-over ? FluentTheme.contrast-button-face : FluentTheme.contrast-highlight-text;
+            }
+            return state == ButtonState.pressed ? FluentTheme.accent-text-pressed : FluentTheme.accent-text;
+        }
+        if (FluentTheme.high-contrast) {
+            return state == ButtonState.normal ? FluentTheme.contrast-text : FluentTheme.contrast-highlight;
+        }
+        if (indicator) {
+            return state == ButtonState.pressed ? FluentTheme.text-tertiary
+                : state == ButtonState.pointer-over ? FluentTheme.text-primary : FluentTheme.text-secondary;
+        }
+        return state == ButtonState.pressed ? FluentTheme.text-secondary : FluentTheme.text-primary;
+    }
+
+    pure function outline(state: ButtonState) -> brush {
+        if (state == ButtonState.disabled) {
+            return root.toggleable && !FluentTheme.high-contrast ? root.edge : transparent;
+        }
+        if (root.show-checked) {
+            if (FluentTheme.high-contrast) {
+                return root.whole-pressed ? FluentTheme.contrast-button-face : FluentTheme.contrast-button-text;
+            }
+            return root.whole-pressed ? transparent : root.checked-edge;
+        }
+        if (FluentTheme.high-contrast) {
+            return state == ButtonState.pointer-over ? FluentTheme.contrast-highlight : transparent;
+        }
+        return state == ButtonState.pressed ? root.edge : root.elevated-edge;
+    }
+
+    capture-key-released(event) => {
+        if (root.operable && !root.open && (event.text == Key.F4
+            || (event.text == Key.DownArrow && event.modifiers.alt))) {
+            primary.use-keyboard-focus();
+            root.open-flyout();
+            return accept;
+        }
+        return reject;
+    }
+
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: root.split + root.divider;
+        height: root.height;
+        border-top-left-radius: root.radius;
+        border-bottom-left-radius: root.radius;
+        background: root.fill(root.primary-state);
+    }
+    Rectangle {
+        x: root.split + root.divider;
+        y: 0px;
+        width: max(0px, root.width - self.x);
+        height: root.height;
+        border-top-right-radius: root.radius;
+        border-bottom-right-radius: root.radius;
+        background: root.fill(root.secondary-state);
+    }
+    primary := FluentPressable {
+        x: 0px;
+        y: 0px;
+        width: root.split + root.divider;
+        height: root.height;
+        enabled: root.operable;
+        focus-on-press: true;
+        accessible-role: button;
+        accessible-label: root.accessible-name;
+        accessible-enabled: self.enabled;
+        accessible-checkable: root.toggleable;
+        accessible-checked: root.toggleable && root.checked-state;
+        accessible-expandable: true;
+        accessible-expanded: root.open;
+        accessible-action-default => { root.activate-primary(); }
+        accessible-action-expand => { root.open-flyout(); }
+
+        pointer-interaction(event, position) => {
+            if (event.kind == PointerEventKind.down || event.kind == PointerEventKind.move) {
+                root.touch-input = event.touch-finger-id != 0;
+            }
+        }
+        activated => { root.activate-primary(); }
+
+        primary-layout := HorizontalLayout {
+            width: parent.width;
+            height: parent.height;
+            padding-left: root.horizontal-padding;
+            padding-right: self.padding-left;
+            padding-top: root.top-padding;
+            padding-bottom: root.bottom-padding;
+            spacing: FluentMetrics.spacing-medium;
+            alignment: start;
+
+            if root.icon.width > 0 : FluentSystemIcon {
+                source: root.icon;
+                foreground: root.primary-foreground;
+            }
+            if root.text != "" : FluentText {
+                text: root.text;
+                color: root.primary-foreground;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+            primary-content { }
+        }
+    }
+
+    secondary := FluentPointerArea {
+        x: root.split + root.divider;
+        y: 0px;
+        width: max(0px, root.width - self.x);
+        height: root.height;
+        enabled: root.operable;
+
+        interaction-event(event) => {
+            if (event.kind == PointerEventKind.down || event.kind == PointerEventKind.move) {
+                root.touch-input = event.touch-finger-id != 0;
+            }
+            if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                primary.use-pointer-focus();
+                primary.focus();
+            }
+        }
+        clicked => { root.open-flyout(); }
+
+        arrow := SplitChevron {
+            x: max(0px, parent.width - FluentMetrics.split-button-chevron-end - self.width);
+            y: (parent.height - self.height) / 2;
+            hovered: secondary.pointer-inside && !root.touch-input;
+            pressed: secondary.pressed-inside;
+            foreground: root.ink(root.secondary-state, true);
+        }
+    }
+
+    Rectangle {
+        x: root.split;
+        y: 0px;
+        width: root.divider;
+        height: root.height;
+        background: root.show-checked ? FluentTheme.accent-stroke-divider
+            : FluentTheme.high-contrast ? FluentTheme.contrast-disabled : root.edge;
+    }
+    SplitOutline {
+        x: 0px;
+        y: 0px;
+        width: root.split;
+        height: root.height;
+        stroke: root.outline(root.primary-state);
+    }
+    SplitOutline {
+        x: root.split + root.divider;
+        y: 0px;
+        width: max(0px, root.width - self.x);
+        height: root.height;
+        trailing: true;
+        stroke: root.outline(root.secondary-state);
+    }
+
+    if primary.focus-visible && !root.open : FluentFocusRing {
+        width: root.width;
+        height: root.height;
+    }
+
+    flyout := Flyout {
+        active: root.operable;
+        viewport: root.viewport;
+        anchor: root.bounds;
+        placement: OverlayPlacement.bottom;
+        viewport-inset: FluentMetrics.spacing-small;
+        anchor-gap: FluentMetrics.spacing-small;
+        theme-transition: true;
+        requested-width: root.flyout-width;
+        requested-height: root.flyout-height;
+        focus-content: root.focus-flyout-content;
+        @children
+    }
+}

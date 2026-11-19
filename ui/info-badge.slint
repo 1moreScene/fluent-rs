@@ -1,0 +1,67 @@
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { FluentText } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export enum InfoBadgeKind { dot, icon, font-icon, value }
+export enum InfoBadgeSeverity { accent, attention, informational, success, caution, critical }
+
+export component InfoBadge inherits Rectangle {
+    in property <int> value: -1;
+    in property <image> icon;
+    in property <string> glyph;
+    in property <string> glyph-font-family;
+    in property <string> label;
+    in property <InfoBadgeSeverity> severity;
+    out property <InfoBadgeKind> kind: root.value >= 0 ? InfoBadgeKind.value
+        : root.icon.width > 0 ? InfoBadgeKind.icon : root.glyph != "" ? InfoBadgeKind.font-icon : InfoBadgeKind.dot;
+
+    property <length> unit: 1px * FluentTheme.ui-scale;
+    property <color> foreground: FluentTheme.high-contrast ? FluentTheme.contrast-highlight-text : FluentTheme.accent-text;
+    property <length> glyph-size: (FluentTheme.dark && !FluentTheme.high-contrast ? 8 : 9) * root.unit;
+    preferred-height: min(16 * root.unit, root.kind == InfoBadgeKind.value ? max(4 * root.unit, count.preferred-height + 2 * root.unit)
+        : root.kind == InfoBadgeKind.icon ? 16 * root.unit
+        : root.kind == InfoBadgeKind.font-icon ? root.glyph-size + 2 * root.unit : 4 * root.unit);
+    preferred-width: max(self.preferred-height, root.kind == InfoBadgeKind.value ? count.preferred-width + 8 * root.unit
+        : root.kind == InfoBadgeKind.icon || root.kind == InfoBadgeKind.font-icon ? 16 * root.unit : 4 * root.unit);
+    width: self.preferred-width;
+    height: self.preferred-height;
+    border-radius: self.height / 2;
+    background: FluentTheme.high-contrast ? FluentTheme.contrast-highlight
+        : root.severity == InfoBadgeSeverity.attention ? FluentTheme.system-attention
+        : root.severity == InfoBadgeSeverity.informational ? FluentTheme.badge-neutral
+        : root.severity == InfoBadgeSeverity.success ? FluentTheme.system-success
+        : root.severity == InfoBadgeSeverity.caution ? FluentTheme.system-caution
+        : root.severity == InfoBadgeSeverity.critical ? FluentTheme.system-critical : FluentTheme.accent-fill;
+
+    accessible-role: text;
+    accessible-label: root.label != "" ? root.label : root.value >= 0 ? "\{root.value}" : "Notification";
+
+    count := FluentText {
+        text: "\{root.value}";
+        visible: root.kind == InfoBadgeKind.value;
+        color: root.foreground;
+        font-size: FluentMetrics.info-badge-number-size;
+        width: 100%;
+        height: 100%;
+        y: -root.unit;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+    if root.kind == InfoBadgeKind.icon : FluentSystemIcon {
+        source: root.icon;
+        foreground: root.foreground;
+        width: 8 * root.unit;
+        height: self.width;
+    }
+    if root.kind == InfoBadgeKind.font-icon : FluentText {
+        text: root.glyph;
+        font-family: root.glyph-font-family;
+        font-size: (FluentTheme.dark && !FluentTheme.high-contrast ? 8 : 9) * 1rem / 14;
+        color: root.foreground;
+        height: 100%;
+        y: -root.unit;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+}

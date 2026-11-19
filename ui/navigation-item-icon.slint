@@ -1,0 +1,31 @@
+import { AnimatedSettingsIcon } from "animated-settings-icon.slint";
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { FluentMetrics } from "tokens.slint";
+
+export enum NavigationIconKind { static-image, animated-settings }
+
+export component NavigationItemIcon inherits Rectangle {
+    in property <NavigationIconKind> kind;
+    in property <image> source;
+    in property <color> foreground;
+    in property <bool> hovered;
+    in property <bool> pressed;
+
+    width: FluentMetrics.navigation-icon-size;
+    height: self.width;
+    accessible-role: none;
+
+    if root.kind == NavigationIconKind.animated-settings : AnimatedSettingsIcon {
+        width: 100%;
+        height: 100%;
+        foreground: root.foreground;
+        hovered: root.hovered;
+        pressed: root.pressed;
+    }
+    if root.kind == NavigationIconKind.static-image : FluentSystemIcon {
+        width: 100%;
+        height: 100%;
+        source: root.source;
+        foreground: root.foreground;
+    }
+}

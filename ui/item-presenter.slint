@@ -1,0 +1,213 @@
+import { ButtonState, FluentPointerArea } from "interaction.slint";
+import { CheckBoxSurface, ToggleValue } from "check-box.slint";
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { FluentFocusRing, FluentText } from "primitives.slint";
+import { FluentMotion } from "motion.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export struct ItemData { text: string, disabled: bool }
+
+export enum ItemAppearance { list-box, combo-box, menu, suggestion, tree, command-overflow }
+export struct ItemDecoration {
+    icon: image,
+    icon-space: bool,
+    indent: int,
+    has-children: bool,
+    expanded: bool,
+    checkable: bool,
+    mixed: bool,
+    command-check-space: bool,
+    command-toggle: bool,
+    command-checked: bool,
+    separator-before: bool,
+}
+
+export component ItemPresenter inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    in property <bool> selected;
+    in property <bool> keyboard-focused;
+    in property <bool> touch-padding;
+    in property <length> content-top;
+    in property <length> content-bottom;
+    in property <ItemAppearance> appearance;
+    in property <ItemDecoration> decoration;
+    callback activated(bool, bool);
+    callback disclosure-clicked;
+    callback check-clicked;
+    property <bool> control-held;
+    property <bool> shift-held;
+    property <bool> list-box: root.appearance == ItemAppearance.list-box;
+    property <bool> combo-box: root.appearance == ItemAppearance.combo-box;
+    property <bool> suggestion: root.appearance == ItemAppearance.suggestion;
+    property <bool> menu: root.appearance == ItemAppearance.menu;
+    property <bool> tree: root.appearance == ItemAppearance.tree;
+    property <bool> command: root.appearance == ItemAppearance.command-overflow;
+    property <length> indent: root.tree ? root.decoration.indent * FluentMetrics.tree-indent : 0px;
+    property <length> check-space: root.tree && root.decoration.checkable ? FluentMetrics.tree-check-width : 0px;
+    property <length> disclosure-space: root.tree ? FluentMetrics.tree-disclosure-width - (root.decoration.checkable ? FluentMetrics.tree-disclosure-padding : 0px) : 0px;
+    property <length> leading: root.indent + root.check-space + root.disclosure-space;
+    property <length> separator-height: root.decoration.separator-before ? FluentMetrics.command-overflow-separator : 0px;
+    property <length> row-top: root.content-top + root.separator-height;
+    property <length> row-height: max(0px, root.height - root.row-top - root.content-bottom);
+    property <length> command-label-offset: root.decoration.command-check-space && root.decoration.icon-space
+        ? FluentMetrics.command-overflow-two-column-label : root.decoration.command-check-space || root.decoration.icon-space
+        ? FluentMetrics.command-overflow-one-column-label : FluentMetrics.command-overflow-inset;
+    property <bool> hovered: pointer.pointer-inside;
+    property <bool> pressed: pointer.pressed-inside;
+    property <bool> intense: FluentTheme.high-contrast && root.enabled && (root.selected || root.hovered);
+    property <color> foreground: !root.enabled ? FluentTheme.text-disabled
+        : root.intense ? FluentTheme.contrast-highlight-text
+        : !root.list-box && !root.menu && root.pressed ? FluentTheme.text-secondary : FluentTheme.text-primary;
+    property <color> fill: !root.enabled ? transparent
+        : root.intense ? FluentTheme.contrast-highlight
+        : root.selected && root.list-box ? (root.pressed ? FluentTheme.list-box-selection-pressed
+            : root.hovered ? FluentTheme.list-box-selection-hover : FluentTheme.list-box-selection)
+        : root.selected ? (root.hovered && !root.pressed ? FluentTheme.subtle-fill-pressed : FluentTheme.subtle-fill-hover)
+        : root.pressed ? FluentTheme.subtle-fill-pressed
+        : root.hovered ? FluentTheme.subtle-fill-hover : transparent;
+
+    accessible-role: list-item;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-item-selected: root.selected;
+    accessible-checkable: root.decoration.checkable || root.decoration.command-toggle;
+    accessible-checked: root.selected || root.decoration.command-checked;
+    accessible-expanded: root.tree && root.decoration.expanded;
+    accessible-action-expand => { if (root.enabled && root.tree && root.decoration.has-children) { root.disclosure-clicked(); } }
+    accessible-action-default => {
+        if (root.enabled) {
+            if (root.decoration.checkable) { root.check-clicked(); }
+            else { root.activated(false, false); }
+        }
+    }
+
+    if root.decoration.separator-before : Rectangle {
+        x: 0px;
+        y: root.content-top + FluentMetrics.spacing-small;
+        width: 100%;
+        height: FluentMetrics.control-stroke;
+        background: FluentTheme.navigation-divider;
+    }
+
+    Rectangle {
+        x: root.list-box ? 0px : root.combo-box ? FluentMetrics.combo-row-inset-x : FluentMetrics.spacing-small;
+        property <length> row-inset: root.list-box || root.command ? 0px : root.tree ? FluentMetrics.tree-row-inset-y
+            : root.menu ? FluentMetrics.menu-item-margin-y : FluentMetrics.combo-row-inset-y;
+        y: root.row-top + self.row-inset;
+        width: max(0px, parent.width - 2 * self.x);
+        height: max(0px, root.row-height - 2 * self.row-inset);
+        border-radius: root.list-box ? 0px : root.combo-box ? FluentMetrics.combo-row-radius : FluentMetrics.control-radius;
+        background: root.fill;
+
+        if root.decoration.command-checked : FluentSystemIcon {
+            x: FluentMetrics.command-overflow-inset - parent.x;
+            y: (parent.height - self.height) / 2;
+            width: FluentMetrics.command-overflow-check-size;
+            source: @image-url("icons/fluent/checkmark-16-regular.svg");
+            foreground: root.foreground;
+        }
+
+        if (root.combo-box || root.suggestion || (root.tree && !root.decoration.checkable)) && root.selected && root.enabled : Rectangle {
+            x: root.suggestion || root.tree ? 0px : FluentMetrics.control-stroke;
+            y: (parent.height - self.height) / 2;
+            width: FluentMetrics.combo-pill-width;
+            height: root.pressed ? FluentMetrics.combo-pill-height * 0.625 : FluentMetrics.combo-pill-height;
+            border-radius: root.suggestion ? FluentMetrics.suggest-indicator-radius : FluentMetrics.combo-pill-radius;
+            background: root.intense ? FluentTheme.contrast-highlight-text : FluentTheme.accent-fill;
+            animate height {
+                enabled: FluentMotion.enabled;
+                duration: FluentMotion.control-fast-duration;
+                easing: FluentMotion.control-fast-out-slow-in;
+            }
+        }
+
+        if root.decoration.icon.width > 0 : FluentSystemIcon {
+            x: root.tree ? root.leading : root.command
+                ? (root.decoration.command-check-space ? FluentMetrics.command-overflow-one-column-label : FluentMetrics.command-overflow-inset) - parent.x
+                : FluentMetrics.button-padding-horizontal;
+            y: (parent.height - self.height) / 2;
+            source: root.decoration.icon;
+            foreground: root.foreground;
+        }
+
+        FluentText {
+            property <length> pad-top: root.command
+                ? (root.touch-padding ? FluentMetrics.command-overflow-touch-row-top : FluentMetrics.command-overflow-row-top) : 0px;
+            property <length> pad-bottom: root.command
+                ? (root.touch-padding ? FluentMetrics.command-overflow-touch-row-bottom : FluentMetrics.command-overflow-row-bottom) : 0px;
+            x: root.command ? root.command-label-offset - parent.x : (root.list-box ? FluentMetrics.list-box-label-left
+                : root.tree ? root.leading
+                : root.suggestion ? FluentMetrics.suggest-label-left - parent.x : FluentMetrics.button-padding-horizontal)
+                + (root.decoration.icon-space || root.decoration.icon.width > 0
+                    ? (root.menu ? FluentMetrics.menu-icon-column : FluentMetrics.navigation-icon-size + FluentMetrics.spacing-medium) : 0px);
+            width: max(0px, parent.width - self.x
+                - (root.command ? FluentMetrics.command-overflow-inset - parent.x : root.suggestion ? FluentMetrics.suggest-label-right - parent.x
+                    : root.tree || root.decoration.icon-space ? FluentMetrics.spacing-medium : self.x));
+            y: self.pad-top;
+            height: max(0px, parent.height - self.pad-top - self.pad-bottom);
+            text: root.text;
+            color: root.foreground;
+            vertical-alignment: center;
+            overflow: root.command ? TextOverflow.clip : TextOverflow.elide;
+            accessible-role: none;
+        }
+
+        if root.keyboard-focused : FluentFocusRing {
+            x: root.list-box ? FluentMetrics.focus-outset : FluentMetrics.control-stroke;
+            y: root.list-box ? FluentMetrics.focus-outset : FluentMetrics.control-stroke;
+            width: max(0px, parent.width - 2 * self.x);
+            height: max(0px, parent.height - 2 * self.y);
+            corner-radius: root.list-box ? 0px : FluentMetrics.combo-row-radius;
+        }
+    }
+
+    pointer := FluentPointerArea {
+        y: root.row-top;
+        height: root.row-height;
+        enabled: root.enabled;
+        interaction-event(event) => {
+            if (event.button == PointerEventButton.left) {
+                root.control-held = event.modifiers.control;
+                root.shift-held = event.modifiers.shift;
+            }
+        }
+        clicked => { root.activated(root.control-held, root.shift-held); }
+    }
+
+    if root.tree && root.decoration.checkable : check-area := FluentPointerArea {
+        x: FluentMetrics.spacing-small + root.indent + FluentMetrics.tree-check-margin;
+        y: 0px;
+        width: FluentMetrics.tree-check-width - FluentMetrics.tree-check-margin;
+        height: parent.height;
+        enabled: root.enabled;
+        clicked => { root.check-clicked(); }
+
+        CheckBoxSurface {
+            width: parent.width;
+            height: parent.height;
+            value: root.decoration.mixed ? ToggleValue.indeterminate : root.selected ? ToggleValue.checked : ToggleValue.unchecked;
+            state: !root.enabled ? ButtonState.disabled : check-area.pressed-inside ? ButtonState.pressed
+                : check-area.pointer-inside ? ButtonState.pointer-over : ButtonState.normal;
+        }
+    }
+
+    if root.tree && root.decoration.has-children : FluentPointerArea {
+        x: FluentMetrics.spacing-small + root.indent + root.check-space;
+        y: 0px;
+        width: root.disclosure-space;
+        height: parent.height;
+        enabled: root.enabled;
+        clicked => { root.disclosure-clicked(); }
+
+        FluentSystemIcon {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: FluentMetrics.tree-disclosure-glyph;
+            source: @image-url("icons/fluent/chevron-down-12-regular.svg");
+            foreground: root.foreground;
+            transform-origin: { x: self.width / 2, y: self.height / 2 };
+            transform-rotation: root.decoration.expanded ? 0deg : -90deg;
+        }
+    }
+}

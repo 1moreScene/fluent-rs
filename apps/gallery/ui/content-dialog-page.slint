@@ -1,0 +1,143 @@
+import { Button } from "../../../ui/button.slint";
+import { ContentDialog, ContentDialogButton, ContentDialogResult } from "../../../ui/content-dialog.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { TextBox } from "../../../ui/text-box.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+enum DialogExample { save, replace, rename }
+
+component InitialNameEditor inherits TextBox {
+    callback report-focus(bool);
+    init => {
+        if (self.visible) { self.focus(); }
+        self.report-focus(self.has-focus);
+    }
+    changed has-focus => { self.report-focus(self.has-focus); }
+}
+
+export component ContentDialogPage inherits FocusScope {
+    in property <OverlayArea> viewport;
+    in property <length> target-size;
+    in property <bool> primary-enabled: true;
+    in property <bool> block-close;
+    out property <bool> open: dialog.open;
+    out property <ContentDialogButton> focused-command: dialog.focused-command;
+    out property <OverlayArea> panel-bounds: dialog.panel-bounds;
+    out property <ContentDialogResult> last-result;
+    out property <int> openings;
+    out property <int> completions;
+    out property <int> editor-submissions;
+    out property <int> background-keys;
+    out property <bool> editor-focused;
+    out property <bool> default-trigger-focused: save.has-focus;
+    out property <bool> no-default-trigger-focused: replace.has-focus;
+    out property <bool> editor-trigger-focused: rename.has-focus;
+    out property <bool> default-trigger-focus-visible: save.focus-visible;
+    out property <Point> default-trigger: { x: save.absolute-position.x + save.width / 2, y: save.absolute-position.y + save.height / 2 };
+    out property <Point> no-default-trigger: { x: replace.absolute-position.x + replace.width / 2, y: replace.absolute-position.y + replace.height / 2 };
+    out property <Point> editor-trigger: { x: rename.absolute-position.x + rename.width / 2, y: rename.absolute-position.y + rename.height / 2 };
+    focus-on-tab-navigation: false;
+    focus-on-click: false;
+    property <DialogExample> example;
+    property <string> draft-name;
+    property <string> result-summary;
+
+    function show-example(example: DialogExample) {
+        if (!dialog.open) {
+            root.example = example;
+            root.editor-focused = false;
+            root.draft-name = "Workshop";
+            dialog.show();
+            root.openings += 1;
+        }
+    }
+
+    key-pressed(event) => {
+        if (event.text != Key.F8) { return reject; }
+        root.background-keys += 1;
+        return accept;
+    }
+
+    examples-scroll := FluentScrollView {
+        width: 100%;
+        height: 100%;
+        content-height: max(self.height, examples.preferred-height);
+
+        examples := VerticalLayout {
+            x: 0px;
+            y: 0px;
+            width: examples-scroll.content-width;
+            height: self.preferred-height;
+            padding: FluentMetrics.focus-outset;
+            spacing: FluentMetrics.spacing-large;
+
+            FlexboxLayout {
+                alignment: start;
+                spacing: FluentMetrics.spacing-medium;
+
+                save := Button {
+                    text: "Save changes";
+                    minimum-target: root.target-size;
+                    clicked => { self.focus(); root.show-example(DialogExample.save); }
+                }
+                replace := Button {
+                    text: "Replace file";
+                    minimum-target: root.target-size;
+                    clicked => { self.focus(); root.show-example(DialogExample.replace); }
+                }
+                rename := Button {
+                    text: "Rename workspace";
+                    minimum-target: root.target-size;
+                    clicked => { self.focus(); root.show-example(DialogExample.rename); }
+                }
+            }
+
+            if root.completions > 0 : FluentText {
+                text: root.result-summary;
+                wrap: word-wrap;
+                accessible-live-region: polite;
+            }
+        }
+    }
+
+    dialog := ContentDialog {
+        viewport: root.viewport;
+        title: root.example == DialogExample.save ? "Save your changes?"
+            : root.example == DialogExample.replace ? "Replace the existing file?" : "Rename workspace";
+        message: root.example == DialogExample.save ? "Choose what to do with your changes before closing this workspace."
+            : root.example == DialogExample.replace ? "A file with this name already exists." : "";
+        primary-text: root.example == DialogExample.replace ? "Replace" : "Save";
+        secondary-text: root.example == DialogExample.save ? "Don't save"
+            : root.example == DialogExample.replace ? "Keep" : "";
+        close-text: "Cancel";
+        default-button: root.example == DialogExample.replace ? ContentDialogButton.none : ContentDialogButton.primary;
+        primary-enabled: root.primary-enabled && (root.example != DialogExample.rename || root.draft-name != "");
+        requested-width: 400px * FluentTheme.ui-scale;
+        requested-height: root.example == DialogExample.rename ? 216px * FluentTheme.ui-scale : FluentMetrics.dialog-min-height;
+        minimum-target: root.target-size;
+        content-takes-initial-focus: root.example == DialogExample.rename;
+        closing(result) => { return !root.block-close; }
+        closed(result) => {
+            root.last-result = result;
+            root.result-summary = result == ContentDialogResult.none ? "Canceled"
+                : root.example == DialogExample.rename ? "Renamed to " + root.draft-name
+                : root.example == DialogExample.save ? (result == ContentDialogResult.primary ? "Changes saved" : "Changes discarded")
+                : (result == ContentDialogResult.primary ? "File replaced" : "Existing file kept");
+            root.completions += 1;
+            root.editor-focused = false;
+        }
+
+        InitialNameEditor {
+            visible: root.example == DialogExample.rename;
+            enabled: self.visible;
+            label: "Workspace name";
+            text: root.draft-name;
+            edited(text) => { root.draft-name = text; }
+            minimum-target: root.target-size;
+            report-focus(focused) => { root.editor-focused = focused; }
+            accepted(text) => { root.editor-submissions += 1; }
+        }
+    }
+}

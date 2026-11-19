@@ -1,6 +1,9 @@
 import { FluentMetrics, FluentTheme } from "tokens.slint";
 
 export global FluentMotion {
+    // Host fallback until a Windows TAS_REPOSITION profile is supplied.
+    in property <duration> switch-reposition-duration: control-fast-duration;
+    in property <easing> switch-reposition-easing: control-fast-out-slow-in;
     out property <bool> enabled: !FluentTheme.reduced-motion && !FluentTheme.high-contrast;
     out property <duration> control-fill-duration: enabled ? FluentMetrics.control-fill-duration : 0ms;
     out property <easing> control-fill-easing: linear;
@@ -12,6 +15,37 @@ export global FluentMotion {
     out property <easing> check-mark-enter-easing: cubic-bezier(0.55, 0, 0, 1);
     out property <duration> control-normal-duration: 250ms;
     out property <duration> control-fast-duration: 167ms;
+    out property <duration> expander-open-duration: 333ms;
+    out property <easing> expander-close-easing: cubic-bezier(1, 1, 0, 1);
+    out property <duration> split-chevron-duration: 29 * 1s / 60;
+    out property <duration> combo-chevron-press: 150ms;
+    out property <duration> combo-chevron-release: 300ms;
+    out property <easing> combo-chevron-press-easing: cubic-bezier(0.167, 0.167, 0.65, 1);
+    out property <easing> combo-chevron-release-easing: cubic-bezier(0.2, 1.5, 0.5, 1);
+    out property <duration> dropdown-reveal: 250ms;
+    out property <duration> dropdown-fade: 83ms;
+    out property <duration> dropdown-close: 167ms;
+    out property <duration> dialog-enter: 250ms;
+    out property <duration> dialog-exit: 167ms;
+    out property <duration> dialog-fade: 83ms;
+    out property <duration> navigation-inline: 200ms;
+    out property <duration> navigation-drawer-enter: 350ms;
+    out property <duration> navigation-drawer-exit: 120ms;
+    out property <easing> navigation-inline-easing: cubic-bezier(0, 0.35, 0.15, 1);
+    out property <easing> navigation-drawer-easing: cubic-bezier(0.1, 0.9, 0.2, 1);
+    out property <duration> navigation-indicator-stretch: 200ms;
+    out property <duration> navigation-indicator-contract: 400ms;
+    out property <duration> navigation-page-exit: 150ms;
+    out property <duration> navigation-page-enter: 300ms;
+    out property <length> navigation-page-travel: 140px * FluentTheme.ui-scale;
+    out property <length> navigation-slide-exit: 150px * FluentTheme.ui-scale;
+    out property <length> navigation-slide-enter: 200px * FluentTheme.ui-scale;
+    out property <length> navigation-flyout-offset: 50px * FluentTheme.ui-scale;
+    out property <duration> navigation-section-fade: 100ms;
+    out property <duration> scroll-bar-expand-delay: 400ms;
+    out property <duration> scroll-bar-contract-delay: 500ms;
+    out property <duration> scroll-bar-resize: 167ms;
+    out property <duration> scroll-bar-fade: 83ms;
     out property <easing> control-fast-out-slow-in: cubic-bezier(0, 0, 0, 1);
     out property <duration> progress-cycle: 2s;
     out property <duration> progress-bar-first-sweep: 1500ms;

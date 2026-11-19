@@ -1,0 +1,31 @@
+import { NavigationIconKind } from "navigation-item-icon.slint";
+
+export enum NavigationItemKind { destination, header, separator }
+
+export struct NavigationItemDetails {
+    index: int,
+    parent-index: int,
+    kind: NavigationItemKind,
+    selects-on-invoked: bool,
+    has-badge: bool,
+    badge-value: int,
+    icon-only: bool,
+    icon-kind: NavigationIconKind,
+}
+
+export struct NavigationRow {
+    index: int,
+    offset: length,
+    extent: length,
+    depth: int,
+    has-children: bool,
+    details: NavigationItemDetails,
+}
+
+export global NavigationTree {
+    pure callback details([NavigationItemDetails], int) -> NavigationItemDetails;
+    pure callback has-children([NavigationItemDetails], int) -> bool;
+    pure callback visible([NavigationItemDetails], [int], int, int, int, bool) -> [int];
+    pure callback ancestor([NavigationItemDetails], [int], int) -> int;
+    pure callback rows([NavigationItemDetails], [int], length, length, length, int) -> [NavigationRow];
+}

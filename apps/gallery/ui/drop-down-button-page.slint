@@ -1,0 +1,138 @@
+import { DropDownButton } from "../../../ui/drop-down-button.slint";
+import { ButtonState } from "../../../ui/interaction.slint";
+import { ItemData, ItemDecoration } from "../../../ui/item-presenter.slint";
+import { MenuPresenter } from "../../../ui/menu-presenter.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+import { PageHost } from "../../../ui/page-host.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { FluentMetrics } from "../../../ui/tokens.slint";
+
+component EmailButton inherits DropDownButton {
+    in property <bool> use-icons;
+    in property <length> longest-command-width;
+    out property <int> focused-command: self.open ? root.focus-index : -1;
+    callback command(string);
+
+    property <int> focus-index: -1;
+    property <[ItemData]> commands: [{ text: "Send" }, { text: "Reply" }, { text: "Reply All" }];
+    property <[ItemDecoration]> command-icons: root.use-icons ? [
+        { icon: @image-url("../../../ui/icons/fluent/arrow-right-20-regular.svg"), icon-space: true },
+        { icon: @image-url("../../../ui/icons/fluent/arrow-left-20-regular.svg"), icon-space: true },
+        { icon: @image-url("../../../ui/icons/fluent/mail-20-regular.svg"), icon-space: true },
+    ] : [];
+
+    accessible-name: "Email";
+    text: root.use-icons ? "" : "Email";
+    icon: root.use-icons ? @image-url("../../../ui/icons/fluent/mail-20-regular.svg") : @image-url("");
+    menu-presentation: true;
+    flyout-width: FluentMetrics.menu-content-width(root.longest-command-width, root.use-icons, root.minimum-target);
+    flyout-height: FluentMetrics.menu-height(root.commands.length, root.minimum-target);
+    focus-flyout-content: true;
+
+    MenuPresenter {
+        width: root.panel-bounds.width;
+        height: root.panel-bounds.height;
+        items: root.commands;
+        decorations: root.command-icons;
+        label: "Email actions";
+        minimum-target: root.minimum-target;
+        focus-changed(index, visible) => { root.focus-index = index; }
+        dismiss => { root.dismiss-flyout(); }
+        invoked(index) => { root.command(root.commands[index].text); }
+    }
+}
+
+export struct DropDownProbe {
+    text-button: OverlayArea,
+    icon-button: OverlayArea,
+    disabled-button: OverlayArea,
+    panel: OverlayArea,
+    open: bool,
+    icon-open: bool,
+    disabled-open: bool,
+    focused: bool,
+    focus-visible: bool,
+    command-index: int,
+    state: ButtonState,
+    disabled-state: ButtonState,
+    chevron-progress: float,
+    command: string,
+}
+
+export component DropDownButtonPage inherits PageHost {
+    in property <bool> active;
+    in property <length> target-size;
+    in property <OverlayArea> viewport;
+    in-out property <bool> email-enabled: true;
+    property <string> last-command;
+    out property <DropDownProbe> probe: {
+        text-button: email.bounds, icon-button: icon-email.bounds, disabled-button: disabled-email.bounds,
+        panel: icon-email.open ? icon-email.panel-bounds : email.panel-bounds, open: email.open,
+        icon-open: icon-email.open, disabled-open: disabled-email.open, focused: email.button-focused,
+        focus-visible: email.focus-visible, command-index: icon-email.open ? icon-email.focused-command : email.focused-command,
+        state: email.state, disabled-state: disabled-email.state, chevron-progress: email.chevron-progress,
+        command: root.last-command,
+    };
+
+    longest-command := FluentText {
+        text: "Reply All";
+        visible: false;
+        accessible-role: none;
+    }
+
+    FluentScrollView {
+        width: 100%;
+        height: 100%;
+        content-height: max(self.height, examples.preferred-height);
+        mouse-drag-pan-enabled: false;
+
+        examples := VerticalLayout {
+            padding: FluentMetrics.focus-outset;
+            spacing: FluentMetrics.spacing-large;
+            alignment: start;
+
+            HorizontalLayout {
+                alignment: start;
+                email := EmailButton {
+                    active: root.active;
+                    enabled: root.email-enabled;
+                    minimum-target: root.target-size;
+                    viewport: root.viewport;
+                    longest-command-width: longest-command.preferred-width;
+                    command(action) => { root.last-command = action; }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: start;
+                icon-email := EmailButton {
+                    active: root.active;
+                    minimum-target: root.target-size;
+                    viewport: root.viewport;
+                    longest-command-width: longest-command.preferred-width;
+                    use-icons: true;
+                    command(action) => { root.last-command = action; }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: start;
+                disabled-email := EmailButton {
+                    text: "Unavailable";
+                    accessible-name: "Unavailable email actions";
+                    active: root.active;
+                    enabled: false;
+                    minimum-target: root.target-size;
+                    viewport: root.viewport;
+                    longest-command-width: longest-command.preferred-width;
+                }
+            }
+
+            if root.last-command != "" : FluentText {
+                text: "Selected: " + root.last-command;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

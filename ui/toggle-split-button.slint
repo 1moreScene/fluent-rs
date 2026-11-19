@@ -1,0 +1,7 @@
+import { SplitButton } from "split-button.slint";
+
+// Both split controls share the same regions, input handlers and Flyout.
+export component ToggleSplitButton inherits SplitButton {
+    in-out property <bool> checked <=> root.checked-state;
+    toggleable: true;
+}

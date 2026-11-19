@@ -1,0 +1,237 @@
+import { ButtonState, FluentPressable } from "interaction.slint";
+import { FluentMotion } from "motion.slint";
+import { FluentFocusRing, FluentText } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export component ToggleSwitchSurface inherits Rectangle {
+    in property <bool> is-on;
+    in property <ButtonState> state;
+    in property <bool> focus-visible;
+    in property <bool> dragging;
+    in property <float> drag-position;
+    in property <string> off-content: @tr("Off");
+    in property <string> on-content: @tr("On");
+    in property <length> minimum-target;
+    out property <length> natural-width: FluentMetrics.switch-track-width
+        + (root.off-content == "" && root.on-content == "" ? 0px
+            : FluentMetrics.switch-content-gap + max(off-measure.preferred-width, on-measure.preferred-width));
+    out property <float> knob-progress: root.dragging ? clamp(root.drag-position, 0, 1) : root.is-on ? 1 : 0;
+    out property <Point> track-position: { x: track.absolute-position.x, y: track.absolute-position.y };
+    out property <Point> knob-center: { x: knob.absolute-position.x + knob.width / 2, y: knob.absolute-position.y + knob.height / 2 };
+
+    property <bool> disabled: root.state == ButtonState.disabled;
+    property <bool> hovered: root.state == ButtonState.pointer-over;
+    property <bool> pressed: root.state == ButtonState.pressed;
+    property <float> on-opacity: root.is-on ? 1 : 0;
+    property <length> knob-width: root.pressed ? FluentMetrics.switch-knob-pressed-width
+        : root.hovered ? FluentMetrics.switch-knob-hover-size : FluentMetrics.switch-knob-size;
+    property <length> knob-height: root.pressed || root.hovered ? FluentMetrics.switch-knob-hover-size : FluentMetrics.switch-knob-size;
+
+    min-width: FluentMetrics.switch-track-width;
+    min-height: max(root.minimum-target, FluentMetrics.switch-track-height + 2 * FluentMetrics.switch-vertical-padding, label.preferred-height);
+    preferred-width: root.natural-width;
+    animate knob-width, knob-height {
+        enabled: FluentMotion.enabled;
+        duration: FluentMetrics.control-fill-duration;
+        easing: FluentMotion.control-fast-out-slow-in;
+    }
+    animate on-opacity {
+        enabled: FluentMotion.enabled;
+        duration: FluentMetrics.control-fill-duration;
+        easing: linear;
+    }
+    animate knob-progress {
+        enabled: FluentMotion.enabled && !root.dragging;
+        duration: FluentMotion.switch-reposition-duration;
+        easing: FluentMotion.switch-reposition-easing;
+    }
+
+    off-measure := FluentText { text: root.off-content; visible: false; }
+    on-measure := FluentText { text: root.on-content; visible: false; }
+
+    track := Rectangle {
+        x: 0px;
+        y: (parent.height - self.height) / 2;
+        width: FluentMetrics.switch-track-width;
+        height: FluentMetrics.switch-track-height;
+        border-radius: self.height / 2;
+        Rectangle {
+            width: 100%;
+            height: 100%;
+            border-radius: parent.border-radius;
+            opacity: 1 - root.on-opacity;
+            border-width: FluentMetrics.control-stroke;
+            border-color: FluentTheme.high-contrast ? (root.disabled ? FluentTheme.contrast-disabled
+                : root.hovered || root.pressed ? FluentTheme.contrast-highlight : FluentTheme.contrast-button-text)
+                : root.disabled ? FluentTheme.control-strong-stroke-disabled : FluentTheme.control-strong-stroke;
+            background: FluentTheme.high-contrast ? (root.disabled ? FluentTheme.contrast-surface
+                : root.hovered || root.pressed ? FluentTheme.contrast-highlight-text : FluentTheme.contrast-button-face)
+                : root.disabled ? transparent : root.pressed ? FluentTheme.control-alt-fill-pressed
+                : root.hovered ? FluentTheme.control-alt-fill-hover : FluentTheme.control-alt-fill;
+            animate background { duration: FluentMotion.control-fill-duration; easing: linear; }
+        }
+
+        Rectangle {
+            width: 100%;
+            height: 100%;
+            border-radius: parent.border-radius;
+            opacity: root.on-opacity;
+            border-width: FluentTheme.high-contrast ? FluentMetrics.control-stroke : 0px;
+            border-color: root.disabled ? FluentTheme.contrast-disabled
+                : root.hovered || root.pressed ? FluentTheme.contrast-button-text : FluentTheme.contrast-highlight;
+            background: FluentTheme.high-contrast ? (root.disabled ? FluentTheme.contrast-surface
+                : root.hovered || root.pressed ? FluentTheme.contrast-button-face : FluentTheme.contrast-highlight)
+                : root.disabled ? FluentTheme.accent-fill-disabled : root.pressed ? FluentTheme.accent-fill-pressed
+                : root.hovered ? FluentTheme.accent-fill-hover : FluentTheme.accent-fill;
+        }
+    }
+
+    knob := Rectangle {
+        x: root.knob-progress * FluentMetrics.switch-track-height
+            + (root.pressed ? (root.is-on ? FluentMetrics.switch-track-height - FluentMetrics.switch-pressed-margin - self.width
+                : FluentMetrics.switch-pressed-margin)
+                : (FluentMetrics.switch-track-height - self.width - FluentMetrics.switch-knob-margin) / 2);
+        y: (parent.height - self.height) / 2;
+        width: root.knob-width;
+        height: root.knob-height;
+        border-radius: self.height / 2;
+        Rectangle {
+            width: 100%;
+            height: 100%;
+            border-radius: parent.border-radius;
+            opacity: 1 - root.on-opacity;
+            background: root.disabled ? FluentTheme.text-disabled
+                : FluentTheme.high-contrast ? (root.hovered || root.pressed ? FluentTheme.contrast-highlight : FluentTheme.contrast-button-text)
+                : FluentTheme.text-secondary;
+        }
+        Rectangle {
+            width: 100%;
+            height: 100%;
+            border-radius: parent.border-radius;
+            opacity: root.on-opacity;
+            background: FluentTheme.high-contrast ? (root.disabled ? FluentTheme.contrast-disabled
+                : root.hovered || root.pressed ? FluentTheme.contrast-button-text : FluentTheme.contrast-highlight-text)
+                : root.disabled ? FluentTheme.accent-text-disabled : FluentTheme.accent-text;
+        }
+    }
+
+    label := FluentText {
+        x: FluentMetrics.switch-track-width + FluentMetrics.switch-content-gap;
+        width: max(0px, parent.width - self.x);
+        height: parent.height;
+        text: root.is-on ? root.on-content : root.off-content;
+        color: root.disabled ? FluentTheme.text-disabled : FluentTheme.text-primary;
+        vertical-alignment: center;
+        wrap: word-wrap;
+        accessible-role: none;
+    }
+    if root.focus-visible && !root.disabled : FluentFocusRing {
+        x: 0px;
+        y: FluentMetrics.switch-focus-inset;
+        width: parent.width;
+        height: max(0px, parent.height - 2 * self.y);
+        horizontal-outset: FluentMetrics.switch-focus-outset;
+    }
+}
+
+export component ToggleSwitch inherits VerticalLayout {
+    in-out property <bool> is-on;
+    in property <string> header;
+    in property <string> off-content: @tr("Off");
+    in property <string> on-content: @tr("On");
+    in property <string> accessible-name: root.header;
+    in property <bool> enabled: true;
+    in property <bool> active: true;
+    in property <length> minimum-target;
+    out property <bool> has-focus: button.has-focus;
+    out property <bool> focus-visible: button.focus-visible;
+    out property <ButtonState> state: button.state;
+    out property <Point> track-position: surface.track-position;
+    out property <Point> knob-center: surface.knob-center;
+    out property <length> hit-width: button.width;
+    out property <length> hit-height: button.height;
+    out property <Point> hit-position: button.absolute-position;
+    out property <bool> dragging;
+    callback toggled(bool);
+
+    property <bool> pointer-held;
+    property <bool> suppress-click;
+    property <length> start-x;
+    property <float> start-position;
+    property <float> drag-position;
+
+    min-width: FluentMetrics.switch-min-width;
+    preferred-width: max(self.min-width, surface.natural-width);
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    spacing: FluentMetrics.switch-header-gap;
+    forward-focus: button;
+    changed is-on => { root.toggled(root.is-on); }
+    changed enabled => { if (!root.enabled) { root.cancel-drag(); } }
+    changed active => { if (!root.active) { root.cancel-drag(); } }
+
+    function cancel-drag() { root.pointer-held = false; root.dragging = false; root.suppress-click = true; }
+
+    if root.header != "" : FluentText {
+        text: root.header;
+        color: root.enabled ? FluentTheme.text-primary : FluentTheme.text-disabled;
+        wrap: word-wrap;
+        accessible-role: none;
+    }
+    button := FluentPressable {
+        width: min(root.width, surface.natural-width);
+        min-height: surface.min-height;
+        preferred-height: self.min-height;
+        horizontal-stretch: 0;
+        vertical-stretch: 0;
+        enabled: root.enabled && root.active;
+        accepts-enter: false;
+        focus-on-click: false;
+        focus-on-press: true;
+        pointer-activation-enabled: !root.suppress-click;
+        accessible-role: checkbox;
+        accessible-label: root.accessible-name;
+        accessible-value: root.is-on ? root.on-content : root.off-content;
+        accessible-checkable: true;
+        accessible-checked: root.is-on;
+        accessible-enabled: self.enabled;
+        accessible-action-default => { if (self.enabled) { root.is-on = !root.is-on; } }
+        activated => { root.is-on = !root.is-on; }
+        pointer-interaction(event, position) => {
+            if (event.kind == PointerEventKind.cancel) { root.cancel-drag(); }
+            if (event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
+                root.pointer-held = true;
+                root.suppress-click = false;
+                root.start-x = position.x;
+                root.start-position = root.is-on ? 1 : 0;
+                root.drag-position = root.start-position;
+            }
+            if (event.kind == PointerEventKind.move && root.pointer-held) {
+                if (position.x != root.start-x) {
+                    root.dragging = true;
+                    root.suppress-click = true;
+                    root.drag-position = clamp(root.start-position + (position.x - root.start-x) / FluentMetrics.switch-track-height, 0, 1);
+                }
+            }
+            if (event.button == PointerEventButton.left && event.kind == PointerEventKind.up) {
+                root.pointer-held = false;
+                if (root.dragging) {
+                    root.is-on = root.drag-position >= 0.5;
+                    root.dragging = false;
+                }
+            }
+        }
+        surface := ToggleSwitchSurface {
+            width: 100%;
+            height: 100%;
+            minimum-target: root.minimum-target;
+            is-on: root.is-on;
+            state: button.state;
+            focus-visible: button.focus-visible;
+            dragging: root.dragging;
+            drag-position: root.drag-position;
+            off-content: root.off-content;
+            on-content: root.on-content;
+        }
+    }
+}

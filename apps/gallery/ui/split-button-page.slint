@@ -1,0 +1,342 @@
+import { Button } from "../../../ui/button.slint";
+import { GridView } from "../../../ui/grid-view.slint";
+import { ButtonState } from "../../../ui/interaction.slint";
+import { ItemData } from "../../../ui/item-presenter.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+import { PageHost } from "../../../ui/page-host.slint";
+import { FluentSurface } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { SplitButton } from "../../../ui/split-button.slint";
+import { TextBox } from "../../../ui/text-box.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+struct Swatch { name: string, paint: color }
+
+component SwatchButton inherits Button {
+    in property <color> paint;
+    in property <length> swatch-size;
+    in property <bool> initial-focus;
+    horizontal-padding: 0px;
+    top-padding: 0px;
+    bottom-padding: 0px;
+    focus-after-opening := Timer {
+        interval: 0ms;
+        running: root.initial-focus;
+        triggered => {
+            self.stop();
+            if (root.initial-focus) { root.focus(); }
+        }
+    }
+
+    content << Rectangle {
+        width: root.swatch-size;
+        height: self.width;
+        border-radius: FluentMetrics.control-radius;
+        background: root.paint;
+        accessible-role: none;
+    }
+}
+
+component TextSwatchPalette inherits FluentScrollView {
+    in property <[Swatch]> colors;
+    in property <length> swatch-size;
+    in property <length> cell-size;
+    in property <length> item-margin;
+    in property <length> panel-stroke;
+    callback chosen(string);
+    property <length> pitch: root.cell-size + 2 * root.item-margin;
+    property <length> horizontal-inset: root.panel-stroke + FluentMetrics.spacing-large;
+    property <int> columns: clamp(floor((root.width - 2 * root.horizontal-inset) / root.pitch), 1, 3);
+    content-width: self.width;
+    content-height: root.panel-stroke * 2 + FluentMetrics.flyout-padding-top
+        + FluentMetrics.flyout-padding-bottom + ceil(root.colors.length / root.columns) * root.pitch;
+    vertical-scrollbar: self.content-height > self.height;
+    mouse-drag-pan-enabled: false;
+
+    FlexboxLayout {
+        width: root.width;
+        height: root.content-height;
+        padding-left: root.horizontal-inset + root.item-margin;
+        padding-right: self.padding-left;
+        padding-top: root.panel-stroke + FluentMetrics.flyout-padding-top + root.item-margin;
+        padding-bottom: root.panel-stroke + FluentMetrics.flyout-padding-bottom + root.item-margin;
+        spacing: 2 * root.item-margin;
+        alignment: start;
+        cross-axis-line-alignment: start;
+        cross-axis-alignment: start;
+
+        for swatch[index] in root.colors : SwatchButton {
+            minimum-target: root.cell-size;
+            accessible-label: swatch.name;
+            swatch-size: root.swatch-size;
+            paint: swatch.paint;
+            initial-focus: index == 0;
+            clicked => { root.chosen(swatch.name); }
+        }
+    }
+}
+
+export struct FontColorGridProbe {
+    columns: int,
+    realized: int,
+    focused: int,
+    selected: int,
+    red: Point,
+    orange: Point,
+    yellow: Point,
+    green: Point,
+    blue: Point,
+    selection-outline: Point,
+}
+
+component FontColorGrid inherits GridView {
+    in property <OverlayArea> panel-bounds;
+    callback report-layout(FontColorGridProbe);
+
+    pure function center-in-window(index: int) -> Point {
+        let item = root.item-bounds(index);
+        return { x: root.panel-bounds.x + item.x + item.width / 2,
+            y: root.panel-bounds.y + item.y + item.height / 2 - root.scroll-offset };
+    }
+    property <FontColorGridProbe> layout-probe: {
+        let selected-item = root.item-bounds(max(0, root.selected-index));
+        return {
+            columns: root.lane-count, realized: root.realized-count,
+            focused: root.focused-index, selected: root.selected-index,
+            red: root.center-in-window(0), orange: root.center-in-window(1),
+            yellow: root.center-in-window(2), green: root.center-in-window(3),
+            blue: root.center-in-window(4),
+            selection-outline: { x: root.panel-bounds.x + selected-item.x + FluentMetrics.grid-selection-stroke / 2,
+                y: root.center-in-window(max(0, root.selected-index)).y },
+        };
+    };
+    init => { root.report-layout(root.layout-probe); focus-after-opening.start(); }
+    changed layout-probe => { root.report-layout(root.layout-probe); }
+    // The popup host captures the anchor focus before this timer runs.
+    focus-after-opening := Timer {
+        interval: 0ms;
+        triggered => { self.stop(); root.focus-item(root.selected-index); }
+    }
+}
+
+export struct SplitButtonProbe {
+    primary: Point,
+    secondary: Point,
+    text-secondary: Point,
+    disabled: Point,
+    font-grid: FontColorGridProbe,
+    anchor: OverlayArea,
+    text-anchor: OverlayArea,
+    panel: OverlayArea,
+    text-panel: OverlayArea,
+    disabled-open: bool,
+    open: bool,
+    text-open: bool,
+    text-focused: bool,
+    text-choice: string,
+    focused: bool,
+    primary-state: ButtonState,
+    secondary-state: ButtonState,
+    chevron: float,
+    selection: string,
+    applied: string,
+    invocations: int,
+}
+
+export component SplitButtonPage inherits PageHost {
+    in property <bool> active;
+    in property <length> target-size;
+    in property <OverlayArea> viewport;
+    property <[Swatch]> colors: [
+        { name: "Red", paint: #ff0000 },
+        { name: "Orange", paint: #ffa500 },
+        { name: "Yellow", paint: #ffff00 },
+        { name: "Green", paint: #008000 },
+        { name: "Blue", paint: #0000ff },
+        { name: "Indigo", paint: #4b0082 },
+        { name: "Violet", paint: #ee82ee },
+        { name: "Gray", paint: #808080 },
+        { name: "Black", paint: #000000 },
+    ];
+    property <[ItemData]> font-colors: [
+        { text: root.colors[0].name }, { text: root.colors[1].name }, { text: root.colors[2].name },
+        { text: root.colors[3].name }, { text: root.colors[4].name }, { text: root.colors[5].name },
+        { text: root.colors[6].name }, { text: root.colors[7].name },
+    ];
+    property <int> selected: 3;
+    property <int> applied: 3;
+    property <int> invocations;
+    property <string> text-choice;
+    property <length> example-padding: 12px * FluentTheme.ui-scale;
+    property <length> swatch-size: 32px * FluentTheme.ui-scale;
+    property <length> tile-size: max(FluentMetrics.grid-min-cell-size, root.target-size);
+    property <length> tile-stride: root.tile-size + FluentMetrics.spacing-small;
+    property <int> font-color-columns: 3;
+    property <FontColorGridProbe> font-grid;
+    property <length> swatch-button-margin: 6px * FluentTheme.ui-scale;
+    property <length> boxed-size: max(root.swatch-size + 2 * FluentMetrics.control-stroke, root.target-size);
+    property <length> boxed-stride: root.boxed-size + 2 * root.swatch-button-margin;
+    property <length> panel-stroke: FluentTheme.high-contrast ? FluentMetrics.focus-outer-stroke : FluentMetrics.control-stroke;
+
+    pure function palette-width(stride: length, columns: int) -> length {
+        return columns * stride + 2 * (FluentMetrics.spacing-large + root.panel-stroke);
+    }
+    pure function palette-height(stride: length, rows: int) -> length {
+        return rows * stride + FluentMetrics.flyout-padding-top + FluentMetrics.flyout-padding-bottom + 2 * root.panel-stroke;
+    }
+    out property <SplitButtonProbe> probe: {
+        primary: main.primary-center, secondary: main.secondary-center, disabled: disabled-button.secondary-center,
+        font-grid: main.open ? root.font-grid : {}, text-secondary: text-button.secondary-center,
+        anchor: main.bounds, text-anchor: text-button.bounds, panel: main.panel-bounds, text-panel: text-button.panel-bounds,
+        disabled-open: disabled-button.open, open: main.open, text-open: text-button.open, focused: main.button-focused,
+        text-focused: text-button.button-focused, text-choice: root.text-choice,
+        primary-state: main.primary-state, secondary-state: main.secondary-state, chevron: main.chevron-progress,
+        selection: root.colors[root.selected].name, applied: root.colors[root.applied].name, invocations: root.invocations,
+    };
+
+    FluentScrollView {
+        width: 100%;
+        height: 100%;
+        content-height: max(self.height, examples.preferred-height);
+        mouse-drag-pan-enabled: false;
+
+        examples := VerticalLayout {
+            padding: FluentMetrics.focus-outset;
+            spacing: FluentMetrics.spacing-large;
+            alignment: start;
+
+            first := FluentSurface {
+                property <bool> side-by-side: root.viewport.width >= 740px && self.width >= 360px * FluentTheme.ui-scale;
+                property <length> options-width: self.side-by-side ? 272px * FluentTheme.ui-scale : self.width;
+                property <length> options-height: typing.preferred-height + 2 * FluentMetrics.spacing-large;
+                property <length> example-height: main.preferred-height + 2 * root.example-padding;
+                height: self.side-by-side ? max(self.example-height, self.options-height)
+                    : self.example-height + FluentMetrics.spacing-page + self.options-height;
+                border-radius: FluentMetrics.overlay-radius;
+                background: FluentTheme.page;
+
+                main := SplitButton {
+                    x: root.example-padding;
+                    y: root.example-padding;
+                    width: self.preferred-width;
+                    height: self.preferred-height;
+                    accessible-name: "Font color";
+                    active: root.active;
+                    viewport: root.viewport;
+                    minimum-target: root.target-size;
+                    horizontal-padding: 0px;
+                    top-padding: 0px;
+                    bottom-padding: 0px;
+                    flyout-width: root.palette-width(root.tile-stride, root.font-color-columns);
+                    flyout-height: root.palette-height(root.tile-stride, ceil(root.font-colors.length / root.font-color-columns))
+                        + FluentMetrics.grid-bottom-padding;
+                    focus-flyout-content: true;
+                    clicked => { root.applied = root.selected; root.invocations += 1; }
+
+                    primary-content << Rectangle {
+                        width: root.swatch-size;
+                        height: self.width;
+                        background: root.colors[root.selected].paint;
+                        border-top-left-radius: FluentMetrics.control-radius;
+                        border-bottom-left-radius: FluentMetrics.control-radius;
+                    }
+
+                    palette := FontColorGrid {
+                        width: 100%;
+                        height: 100%;
+                        label: "Font colors";
+                        items: root.font-colors;
+                        item-width: root.tile-size;
+                        item-height: root.tile-size;
+                        maximum-rows-or-columns: root.font-color-columns;
+                        content-padding-left: root.panel-stroke + FluentMetrics.spacing-large;
+                        content-padding-right: self.content-padding-left;
+                        content-padding-top: root.panel-stroke + FluentMetrics.flyout-padding-top;
+                        content-padding-bottom: root.panel-stroke + FluentMetrics.flyout-padding-bottom + FluentMetrics.grid-bottom-padding;
+                        item-click-enabled: true;
+                        panel-bounds: main.panel-bounds;
+                        report-layout(layout) => { root.font-grid = layout; }
+                        item-clicked(index) => { root.selected = index; root.applied = index; main.dismiss-flyout(); }
+
+                        item-content(index) => {
+                            return {
+                                width: root.swatch-size, height: root.swatch-size,
+                                corner-radius: FluentMetrics.control-radius, background: root.colors[index].paint,
+                            };
+                        }
+                    }
+                }
+
+                Rectangle {
+                    x: first.width - first.options-width;
+                    y: first.side-by-side ? 0px : first.example-height + FluentMetrics.spacing-page;
+                    width: first.options-width;
+                    height: first.side-by-side ? first.height : first.options-height;
+                    background: FluentTheme.card-fill;
+                    border-top-right-radius: first.side-by-side ? FluentMetrics.overlay-radius : 0px;
+                    border-bottom-right-radius: FluentMetrics.overlay-radius;
+                    border-bottom-left-radius: first.side-by-side ? 0px : FluentMetrics.overlay-radius;
+                    Rectangle {
+                        width: first.side-by-side ? FluentMetrics.control-stroke : parent.width;
+                        height: first.side-by-side ? parent.height : FluentMetrics.control-stroke;
+                        background: FluentTheme.navigation-divider;
+                    }
+
+                    typing := TextBox {
+                        x: FluentMetrics.spacing-large;
+                        y: FluentMetrics.spacing-large;
+                        width: max(0px, parent.width - 2 * self.x);
+                        height: max(self.preferred-height, 96px * FluentTheme.ui-scale);
+                        preferred-height: max(self.min-height, 96px * FluentTheme.ui-scale);
+                        text: "Select a color for this text.";
+                        editor-foreground: FluentTheme.high-contrast ? FluentTheme.text-primary : root.colors[root.applied].paint;
+                        placeholder-text: "Type something here";
+                        accessible-name: self.placeholder-text;
+                        multiline: true;
+                        vertical-scrollbar: true;
+                    }
+                }
+            }
+
+            second := FluentSurface {
+                height: text-button.preferred-height + 2 * root.example-padding;
+                border-radius: FluentMetrics.overlay-radius;
+                background: FluentTheme.page;
+                text-button := SplitButton {
+                    x: root.example-padding;
+                    y: root.example-padding;
+                    width: self.preferred-width;
+                    height: self.preferred-height;
+                    text: "Choose color";
+                    accessible-name: "Font color with text";
+                    active: root.active;
+                    viewport: root.viewport;
+                    minimum-target: root.target-size;
+                    horizontal-padding: 5px * FluentTheme.ui-scale;
+                    top-padding: self.horizontal-padding;
+                    bottom-padding: self.horizontal-padding;
+                    flyout-width: root.palette-width(root.boxed-stride, 3);
+                    flyout-height: root.palette-height(root.boxed-stride, 3);
+                    focus-flyout-content: true;
+
+                    TextSwatchPalette {
+                        colors: root.colors;
+                        swatch-size: root.swatch-size;
+                        cell-size: root.boxed-size;
+                        item-margin: root.swatch-button-margin;
+                        panel-stroke: root.panel-stroke;
+                        chosen(name) => { root.text-choice = name; text-button.dismiss-flyout(); }
+                    }
+                }
+            }
+
+            disabled-button := SplitButton {
+                active: root.active;
+                viewport: root.viewport;
+                enabled: false;
+                text: "Choose color";
+                minimum-target: root.target-size;
+            }
+        }
+    }
+}

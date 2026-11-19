@@ -1,0 +1,86 @@
+import { Button } from "../../../ui/button.slint";
+import { PageHost } from "../../../ui/page-host.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+import { TreeNode, TreeSelectionMode, TreeView } from "../../../ui/tree-view.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+
+export struct TreeViewProbe {
+    bounds: OverlayArea,
+    count: int,
+    row-height: length,
+    offset: length,
+    selected: [int],
+    mixed: [int],
+    focused: int,
+    invoked: int,
+}
+
+export component TreeViewPage inherits PageHost {
+    in property <length> target-size;
+    in-out property <bool> multiple;
+    in-out property <bool> large;
+    callback load-large() -> [TreeNode];
+    property <[TreeNode]> large-nodes;
+    changed large => {
+        if (root.large && root.large-nodes.length == 0) { root.large-nodes = root.load-large(); }
+        tree.expanded = root.large ? [] : [0];
+    }
+
+    property <int> invoked: -1;
+    out property <TreeViewProbe> probe: {
+        bounds: { x: tree.absolute-position.x, y: tree.absolute-position.y, width: tree.width, height: tree.height },
+        count: tree.visible-count, row-height: tree.row-height, offset: tree.scroll-offset,
+        selected: tree.selected, mixed: tree.partially-selected, focused: tree.focused-index, invoked: root.invoked,
+    };
+
+    VerticalLayout {
+        padding: FluentMetrics.focus-outset;
+        spacing: FluentMetrics.spacing-medium;
+        FlexboxLayout {
+            alignment: start;
+            spacing: FluentMetrics.spacing-medium;
+            Button {
+                text: root.multiple ? "Single selection" : "Multiple selection";
+                minimum-target: root.target-size;
+                clicked => { root.multiple = !root.multiple; }
+            }
+            Button {
+                text: root.large ? "Small tree" : "Large tree";
+                minimum-target: root.target-size;
+                clicked => { root.large = !root.large; }
+            }
+        }
+
+        Rectangle {
+            vertical-stretch: 1;
+            border-width: FluentMetrics.control-stroke;
+            border-color: FluentTheme.card-stroke;
+            tree := TreeView {
+                x: FluentMetrics.control-stroke;
+                y: FluentMetrics.control-stroke;
+                width: max(0px, parent.width - 2 * self.x);
+                height: max(0px, parent.height - 2 * self.y);
+                label: "Workspace files";
+                minimum-target: root.target-size;
+                selection-mode: root.multiple ? TreeSelectionMode.multiple : TreeSelectionMode.single;
+                expanded: [0];
+                nodes: root.large ? root.large-nodes : [
+                    { text: "Workspace", parent-index: -1, icon: @image-url("../../../ui/icons/fluent/folder-20-regular.svg") },
+                    { text: "Documentation", parent-index: 0, icon: @image-url("../../../ui/icons/fluent/folder-20-regular.svg") },
+                    { text: "Guide.md", parent-index: 1, icon: @image-url("../../../ui/icons/fluent/document-20-regular.svg") },
+                    { text: "Notes.md", parent-index: 0, icon: @image-url("../../../ui/icons/fluent/document-20-regular.svg") },
+                    { text: "Pictures", parent-index: -1, icon: @image-url("../../../ui/icons/fluent/folder-20-regular.svg") },
+                    { text: "Cover.png", parent-index: 4, icon: @image-url("../../../ui/icons/fluent/document-20-regular.svg") },
+                    { text: "Archived", parent-index: -1, disabled: true },
+                ];
+                item-invoked(index) => { root.invoked = index; }
+            }
+        }
+
+        FluentText {
+            text: "{tree.selected.length} selected";
+            color: FluentTheme.text-secondary;
+        }
+    }
+}

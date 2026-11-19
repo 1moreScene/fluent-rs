@@ -1,0 +1,36 @@
+import { NavigationTransition, PageRoute } from "frame.slint";
+import { FluentMotion } from "motion.slint";
+import { NavigationMotion } from "navigation-motion.slint";
+import { PageHost } from "page-host.slint";
+
+export component Page inherits PageHost {
+    in property <int> route-id: -1;
+    in property <PageRoute> route;
+    in property <string> title;
+    out property <bool> is-current: root.route-id >= 0 && root.route.current == root.route-id;
+    out property <bool> is-leaving: root.route-id >= 0 && root.route.outgoing == root.route-id;
+    callback navigated-to;
+    callback navigated-from;
+    property <bool> exiting: root.route.elapsed < FluentMotion.navigation-page-exit;
+    property <float> exit-progress: NavigationMotion.exit(root.route.elapsed / FluentMotion.navigation-page-exit);
+    property <float> enter-progress: NavigationMotion.enter((root.route.elapsed - FluentMotion.navigation-page-exit) / FluentMotion.navigation-page-enter);
+    property <bool> horizontal: root.route.transition != NavigationTransition.entrance;
+    property <float> side: root.route.transition == NavigationTransition.from-left ? 1 : -1;
+    property <length> entry-travel: (root.route.backward ? FluentMotion.navigation-slide-exit : -FluentMotion.navigation-slide-enter) * root.side;
+    property <length> exit-travel: (root.route.backward ? -FluentMotion.navigation-slide-enter : FluentMotion.navigation-slide-exit) * root.side;
+
+    accessible-role: region;
+    accessible-label: root.title;
+    visible: root.route-id < 0 || (root.is-current && !root.exiting) || (root.is-leaving && root.exiting);
+    x: !root.horizontal ? 0px : root.is-current ? root.entry-travel * (1 - root.enter-progress)
+        : root.is-leaving ? root.exit-travel * root.exit-progress : 0px;
+    y: root.horizontal ? 0px : root.route.backward ? (root.is-leaving ? FluentMotion.navigation-page-travel * root.exit-progress : 0px)
+        : root.is-current ? FluentMotion.navigation-page-travel * (1 - root.enter-progress) : 0px;
+    opacity: root.horizontal ? 1 : root.route.backward ? (root.is-current ? root.enter-progress : 1)
+        : root.is-leaving ? 1 - root.exit-progress : 1;
+
+    changed is-current => {
+        if (root.is-current) { root.navigated-to(); }
+        else { root.navigated-from(); }
+    }
+}

@@ -5,6 +5,13 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 
+[features]
+profile-graphics = ["dep:profile-skia"]
+
+[dependencies]
+fluent-core = { path = "../../crates/fluent-core" }
+fluent-materials = { path = "../../crates/fluent-materials" }
+
 [lib]
 crate-type = ["rlib", "cdylib"]
 
@@ -15,6 +22,14 @@ windows-sys = { version = "=0.61.2", features = ["Wdk_System_SystemServices", "W
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 slint = { workspace = true, features = ["backend-winit", "accessibility"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+profile-skia = { package = "i-slint-renderer-skia", version = "=1.19.0", default-features = false, features = ["unstable-wgpu-30"], optional = true }
+slint = { workspace = true, features = ["raw-window-handle-06"] }
+objc2 = "=0.6.5"
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["NSAccessibility", "NSAppearance", "NSGraphics", "NSPasteboard", "NSPasteboardItem", "NSResponder", "NSView", "NSVisualEffectView", "NSWindow", "NSWorkspace"] }
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["NSArray", "NSData", "NSString", "NSURL"] }
+raw-window-handle = "=0.6.2"
 
 [target.'cfg(target_os = "android")'.dependencies]
 slint = { workspace = true, features = ["backend-android-activity-06"] }

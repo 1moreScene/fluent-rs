@@ -1,0 +1,91 @@
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { FluentMotion } from "motion.slint";
+import { FluentTheme } from "tokens.slint";
+
+export struct AnimationMarker { name: string, progress: float }
+export struct AnimationSegment { start: float, end: float }
+
+export global AnimatedIconLogic {
+    pure callback queue([string], string) -> [string];
+    pure callback skip-first([string]) -> [string];
+    pure callback segment([AnimationMarker], string, string) -> AnimationSegment;
+}
+
+export component AnimatedIcon inherits Rectangle {
+    in property <string> state;
+    in property <[AnimationMarker]> markers;
+    in property <duration> source-duration;
+    in property <image> fallback-icon;
+    in property <color> foreground: FluentTheme.text-primary;
+    in property <bool> source-available: root.markers.length > 0;
+    out property <float> progress: timer.running && FluentMotion.enabled
+        ? root.segment.start + (root.segment.end - root.segment.start) * clamp((animation-tick() - root.started) / max(1ms, root.segment-duration), 0, 1)
+        : root.segment.end;
+    out property <bool> playing: timer.running;
+    property <AnimationSegment> segment;
+    property <duration> started;
+    property <duration> segment-duration;
+    property <string> current-state;
+    property <[string]> queued;
+
+    accessible-role: none;
+
+    init => { root.reset(); }
+    changed markers => { root.reset(); }
+    changed state => {
+        if (timer.running) {
+            if (root.queued.length >= 4) { timer.stop(); root.advance(); }
+            root.queued = AnimatedIconLogic.queue(root.queued, root.state);
+            if (!timer.running) { root.advance(); }
+        } else { root.play(root.state); }
+    }
+
+    property <bool> motion: FluentMotion.enabled;
+    changed motion => { if (!root.motion) { root.reset(); } }
+
+    function reset() {
+        timer.stop();
+        root.queued = [];
+        root.current-state = root.state;
+        let marker = AnimatedIconLogic.segment(root.markers, root.state, root.state);
+        root.segment = { start: marker.end, end: marker.end };
+    }
+
+    function advance() {
+        if (root.queued.length > 0) {
+            let next = root.queued[0];
+            root.queued = AnimatedIconLogic.skip-first(root.queued);
+            root.play(next);
+        }
+    }
+
+    function play(target: string) {
+        if (root.current-state != target) {
+            root.segment = AnimatedIconLogic.segment(root.markers, root.current-state, target);
+            root.current-state = target;
+            root.segment-duration = abs(root.segment.end - root.segment.start) * root.source-duration;
+            if (root.segment-duration >= 20ms && FluentMotion.enabled) {
+                root.started = animation-tick();
+                timer.start();
+            }
+        }
+        if (!timer.running && root.queued.length > 0) {
+            root.segment-duration = 1ms;
+            timer.start();
+        }
+    }
+
+    timer := Timer {
+        running: false;
+        interval: root.segment-duration;
+        triggered => { self.stop(); root.advance(); }
+    }
+
+    if !root.source-available : FluentSystemIcon {
+        width: 100%;
+        height: 100%;
+        source: root.fallback-icon;
+        foreground: root.foreground;
+    }
+    @children
+}

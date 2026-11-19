@@ -1,0 +1,427 @@
+import { NavigationTransition } from "frame.slint";
+import { ItemData } from "item-presenter.slint";
+import { TopNavigationSlot } from "navigation-layout.slint";
+import { NavigationPaneMotion } from "navigation-motion.slint";
+import { NavigationIconButton, NavigationPane, NavigationPaneGroup } from "navigation-pane.slint";
+import { NavigationTopBar } from "navigation-top.slint";
+import { NavigationItemDetails, NavigationItemKind, NavigationTree } from "navigation-tree.slint";
+import { OverlayArea, OverlayHost } from "overlay-host.slint";
+import { FluentSurface, FluentText } from "primitives.slint";
+import { SelectionLogic, SelectionModel } from "selection-model.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export enum NavigationPaneDisplayMode { auto, left, top, left-compact, left-minimal }
+export enum NavigationDisplayMode { minimal, compact, expanded, top }
+
+export component NavigationView inherits Rectangle {
+    slot pane-header;
+    slot pane-custom-content;
+    slot pane-footer;
+    slot top-header;
+    slot top-custom-content;
+    slot top-footer;
+
+    in property <[ItemData]> items;
+    in property <[image]> icons;
+    in property <[NavigationItemDetails]> item-details;
+    in property <int> footer-start: -1;
+    in property <bool> pane-visible: true;
+    in property <bool> show-back-button;
+    in property <bool> back-enabled;
+    in property <string> pane-title;
+    in property <int> initial-selected-index: -1;
+    in property <NavigationPaneDisplayMode> pane-display-mode;
+    in property <length> compact-threshold: FluentMetrics.navigation-compact-threshold;
+    in property <length> expanded-threshold: FluentMetrics.navigation-expanded-threshold;
+    in property <length> compact-pane-width: FluentMetrics.navigation-rail-width;
+    in property <length> open-pane-width: FluentMetrics.navigation-open-width;
+    in property <length> minimum-target;
+    in property <bool> selection-follows-focus;
+    in property <OverlayArea> viewport: root.view-bounds;
+    in property <bool> active: true;
+    in property <brush> content-background: FluentTheme.navigation-content-fill;
+
+    out property <NavigationDisplayMode> display-mode:
+        root.pane-display-mode == NavigationPaneDisplayMode.top ? NavigationDisplayMode.top
+        : root.pane-display-mode == NavigationPaneDisplayMode.left ? NavigationDisplayMode.expanded
+        : root.pane-display-mode == NavigationPaneDisplayMode.left-compact ? NavigationDisplayMode.compact
+        : root.pane-display-mode == NavigationPaneDisplayMode.left-minimal ? NavigationDisplayMode.minimal
+        : root.width >= root.expanded-threshold ? NavigationDisplayMode.expanded
+        : root.width > 0px && root.width < root.compact-threshold ? NavigationDisplayMode.minimal
+        : NavigationDisplayMode.compact;
+    out property <int> selected-index: selection.selected-index;
+    out property <bool> pane-open: root.pane-visible && !root.top-mode && (root.inline-mode ? !root.inline-closed : drawer.open && !drawer.closing);
+    out property <bool> drawer-open: drawer.open;
+    out property <bool> drawer-acrylic: drawer.acrylic-applied;
+    out property <float> drawer-progress: drawer.pane-reveal;
+    out property <length> pane-width: !root.pane-visible || root.top-mode ? 0px
+        : min(root.width, root.rail-width + (root.expanded-width - root.rail-width) * inline-motion.progress);
+    out property <length> indicator-height: root.top-mode ? top-bar.indicator-width : rail.indicator-height;
+    out property <bool> toggle-focused: toggle.has-focus;
+    out property <int> focused-index: root.top-mode ? top-bar.focused-index : rail.focused-index;
+    out property <Point> toggle-center: { x: toggle.absolute-position.x + toggle.width / 2, y: toggle.absolute-position.y + toggle.height / 2 };
+    out property <Point> items-origin: rail.absolute-position;
+    out property <length> pane-custom-height: inline-extra.height;
+    out property <length> top-custom-width: top-tail.width;
+    out property <length> item-step: rail.row-step;
+    out property <Point> footer-origin: rail.footer-origin;
+    out property <Point> back-center: { x: back-button.absolute-position.x + back-button.width / 2, y: back-button.absolute-position.y + back-button.height / 2 };
+    out property <bool> overflow-open: top-bar.overflow-open;
+    out property <bool> overflow-acrylic: top-bar.overflow-acrylic;
+    out property <[int]> overflow-items: top-bar.overflow-items;
+    out property <int> overflow-count: top-bar.overflow-count;
+    out property <Point> overflow-center: top-bar.overflow-center;
+    out property <OverlayArea> overflow-bounds: top-bar.overflow-bounds;
+    out property <Point> top-items-origin: top-bar.items-origin;
+    out property <[TopNavigationSlot]> top-items: top-bar.primary;
+    out property <bool> child-flyout-open: children-flyout.open;
+    out property <OverlayArea> child-flyout-bounds: children-flyout.panel-bounds;
+    out property <[int]> expanded-items;
+    out property <NavigationTransition> recommended-transition;
+    out property <OverlayArea> drawer-bounds: drawer.panel-bounds;
+    out property <OverlayArea> content-bounds: {
+        x: surface.absolute-position.x, y: surface.absolute-position.y, width: surface.width, height: surface.height,
+    };
+
+    callback selection-changed(int);
+    callback item-invoked(int);
+    callback back-requested;
+
+    property <bool> inline-mode: root.display-mode == NavigationDisplayMode.expanded;
+    property <bool> top-mode: root.display-mode == NavigationDisplayMode.top;
+    property <bool> minimal: root.display-mode == NavigationDisplayMode.minimal;
+    property <bool> inline-closed;
+    property <bool> animate-inline;
+    property <length> rail-width: root.minimal || root.top-mode || !root.pane-visible ? 0px : max(root.minimum-target, root.compact-pane-width);
+    property <length> expanded-width: max(root.rail-width, root.open-pane-width);
+    property <length> layout-pane-width: min(root.width, root.pane-visible && root.inline-mode && !root.inline-closed
+        ? root.expanded-width : root.rail-width);
+    property <length> header-height: max(FluentMetrics.navigation-header-height, root.minimum-target);
+    property <OverlayArea> view-bounds: { x: self.absolute-position.x, y: self.absolute-position.y, width: self.width, height: self.height };
+    property <length> drawer-width: min(root.width, root.open-pane-width);
+    property <bool> top-chrome: root.top-mode && (root.pane-visible || root.show-back-button);
+    property <length> back-slot: root.show-back-button ? max(FluentMetrics.navigation-icon-slot, root.minimum-target) : 0px;
+    property <length> left-header-height: root.header-height + (root.show-back-button && !root.minimal ? root.header-height : 0px);
+    property <int> child-parent: -1;
+    property <OverlayArea> child-anchor;
+    property <[int]> child-indices: root.child-parent >= 0 ? NavigationTree.visible(root.item-details,
+        root.expanded-items, root.child-parent + 1, root.items.length, root.child-parent, false) : [];
+
+    clip: true;
+    init => { selection.set-index(root.initial-selected-index); }
+    changed display-mode => {
+        root.animate-inline = false;
+        drawer.dismiss();
+        children-flyout.dismiss();
+    }
+
+    public function set-selected-index(index: int) {
+        selection.set-index(index);
+    }
+
+    public function toggle-pane() {
+        if (root.active && root.pane-visible && !root.top-mode) {
+            if (root.inline-mode) {
+                root.animate-inline = true;
+                root.inline-closed = !root.inline-closed;
+            } else if (drawer.open) {
+                drawer.dismiss-with-transition();
+            } else {
+                drawer.show();
+            }
+        }
+    }
+
+    function select(index: int, from-overflow: bool) {
+        let details = NavigationTree.details(root.item-details, index);
+        if (details.kind == NavigationItemKind.destination && details.selects-on-invoked) {
+            root.recommended-transition = !root.top-mode || root.selected-index < 0 ? NavigationTransition.entrance
+                : from-overflow || index > root.selected-index ? NavigationTransition.from-right : NavigationTransition.from-left;
+            selection.activate(index, false);
+        }
+    }
+
+    function invoke(index: int, from-overflow: bool, bounds: OverlayArea) {
+        if (selection.enabled(index)) {
+            root.select(index, from-overflow);
+            root.item-invoked(index);
+            if (NavigationTree.has-children(root.item-details, index)) {
+                root.toggle-branch(index, bounds);
+            } else {
+                if (!root.inline-mode && !root.top-mode) { drawer.dismiss-with-transition(); }
+                children-flyout.dismiss-with-transition();
+            }
+        }
+    }
+
+    function toggle-branch(index: int, bounds: OverlayArea) {
+        let branch = NavigationTree.details(root.item-details, index);
+        if (branch.parent-index < 0 && (root.top-mode || !root.pane-open)) {
+            if (children-flyout.open && root.child-parent == index) {
+                children-flyout.dismiss-with-transition();
+            } else {
+                children-flyout.dismiss();
+                root.child-parent = index;
+                root.child-anchor = bounds;
+                children-flyout.show();
+            }
+        } else {
+            root.expanded-items = SelectionLogic.update(root.expanded-items, index, true);
+        }
+    }
+
+    selection := SelectionModel {
+        items: root.items;
+        changed-by-user => { root.selection-changed(self.selected-index); }
+    }
+
+    inline-motion := NavigationPaneMotion {
+        expanded: root.pane-visible && root.inline-mode && !root.inline-closed;
+        animate-changes: root.animate-inline;
+    }
+
+    surface := FluentSurface {
+        x: root.pane-width;
+        y: root.top-chrome ? max(FluentMetrics.navigation-top-height, root.minimum-target)
+            : root.minimal && (root.pane-visible || root.show-back-button) ? root.header-height : 0px;
+        // Lay out at the destination width once, then slide the already-laid-out page.
+        width: max(0px, root.width - root.layout-pane-width);
+        height: max(0px, root.height - self.y);
+        background: root.content-background;
+        border-top-left-radius: root.rail-width > 0px ? FluentMetrics.overlay-radius : 0px;
+        border-top-right-radius: 0px;
+        border-bottom-left-radius: 0px;
+        border-bottom-right-radius: 0px;
+        border-width: 0px;
+        clip: true;
+
+        Rectangle {
+            visible: root.pane-visible || root.show-back-button;
+            x: 0px;
+            y: 0px;
+            height: FluentMetrics.control-stroke;
+            width: 100%;
+            background: FluentTheme.card-stroke;
+        }
+        if root.rail-width > 0px : Rectangle {
+            x: 0px;
+            y: 0px;
+            width: FluentMetrics.control-stroke;
+            height: 100%;
+            background: FluentTheme.card-stroke;
+        }
+        @children
+    }
+
+    inline-extra := VerticalLayout {
+        x: 0px;
+        y: root.left-header-height;
+        width: root.pane-width;
+        height: self.visible ? min(max(0px, root.height - self.y), self.preferred-height) : 0px;
+        visible: root.active && root.pane-visible && !root.top-mode && !root.minimal && !drawer.open && root.pane-width > 0px;
+        pane-custom-content { }
+    }
+
+    Rectangle {
+        x: 0px;
+        y: root.left-header-height + inline-extra.height;
+        width: root.pane-width;
+        height: max(0px, root.height - self.y);
+        visible: root.active && root.pane-visible && !root.top-mode && !root.minimal && !drawer.open;
+        clip: true;
+
+        rail := NavigationPaneGroup {
+            x: 0px;
+            y: 0px;
+            width: min(root.width, self.show-labels ? root.expanded-width : root.rail-width);
+            height: 100%;
+            show-labels: root.inline-mode && inline-motion.progress > 0;
+            section-open: root.inline-mode && !root.inline-closed;
+            label-opacity: inline-motion.progress;
+            items: parent.visible ? root.items : [];
+            icons: root.icons;
+            details: root.item-details;
+            expanded: root.expanded-items;
+            footer-start: root.footer-start;
+            pane-footer << pane-footer;
+            minimum-target: root.minimum-target;
+            selected-index: root.selected-index;
+            selection-follows-focus: root.selection-follows-focus;
+            item-invoked(index, bounds) => { root.invoke(index, false, bounds); }
+            branch-toggled(index, bounds) => { root.toggle-branch(index, bounds); }
+            item-focused(index) => { root.select(index, false); }
+        }
+    }
+
+    top-leading := HorizontalLayout {
+        x: root.back-slot;
+        y: 0px;
+        width: self.visible ? min(max(0px, root.width - self.x), self.preferred-width) : 0px;
+        height: top-bar.height;
+        visible: root.top-mode && root.pane-visible;
+        top-header { }
+    }
+
+    top-tail := HorizontalLayout {
+        x: max(top-bar.x, top-bar.x + top-bar.footer-boundary - self.width);
+        y: 0px;
+        width: self.visible ? min(max(0px, top-bar.width - FluentMetrics.navigation-icon-slot), self.preferred-width) : 0px;
+        height: top-bar.height;
+        visible: root.top-mode && root.pane-visible;
+        top-custom-content { }
+        top-footer { }
+    }
+
+    top-bar := NavigationTopBar {
+        x: root.back-slot + top-leading.width;
+        y: 0px;
+        width: max(0px, root.width - self.x);
+        height: max(FluentMetrics.navigation-top-height, root.minimum-target);
+        visible: root.top-mode && root.pane-visible;
+        active: root.active && self.visible;
+        items: root.top-mode ? root.items : [];
+        icons: root.icons;
+        details: root.item-details;
+        open-branch: children-flyout.open && !children-flyout.closing ? root.child-parent : -1;
+        footer-start: root.footer-start;
+        minimum-target: root.minimum-target;
+        trailing-width: top-tail.width;
+        viewport: root.viewport;
+        selected-index: root.selected-index;
+        selection-follows-focus: root.selection-follows-focus;
+        invoke(index, from-overflow, bounds) => { root.invoke(index, from-overflow, bounds); }
+        focus-select(index) => { root.select(index, false); }
+    }
+
+    back-button := NavigationIconButton {
+        x: FluentMetrics.navigation-item-inset-x;
+        y: ((root.top-mode ? top-bar.height : root.header-height) - self.height) / 2;
+        visible: root.show-back-button && !drawer.open;
+        enabled: root.active && root.show-back-button && root.back-enabled;
+        icon: @image-url("icons/fluent/arrow-left-20-regular.svg");
+        label: "Back";
+        activated => { root.back-requested(); }
+    }
+
+    toggle := NavigationIconButton {
+        x: FluentMetrics.navigation-item-inset-x + (root.minimal ? root.back-slot : 0px);
+        y: root.left-header-height - (root.header-height + self.height) / 2;
+        width: max(FluentMetrics.navigation-icon-slot, root.minimum-target - 2 * self.x);
+        height: max(FluentMetrics.navigation-item-height, root.minimum-target - 2 * self.x);
+        visible: root.pane-visible && !root.top-mode;
+        enabled: root.active && self.visible;
+        icon: @image-url("icons/fluent/navigation-20-regular.svg");
+        label: root.pane-open ? "Close navigation pane" : "Open navigation pane";
+        accessible-expanded: root.pane-open;
+        activated => { root.toggle-pane(); }
+    }
+
+    HorizontalLayout {
+        x: toggle.x + toggle.width + FluentMetrics.navigation-item-inset-x;
+        y: toggle.y - (root.header-height - toggle.height) / 2;
+        width: max(0px, root.pane-width - self.x - FluentMetrics.navigation-item-inset-x);
+        height: root.header-height;
+        visible: root.pane-visible && root.inline-mode && inline-motion.progress > 0;
+        spacing: root.pane-title == "" ? 0px : FluentMetrics.spacing-small;
+        alignment: start;
+        if root.pane-title != "" : FluentText {
+            vertical-alignment: center;
+            text: root.pane-title;
+            opacity: inline-motion.progress;
+            font-weight: FluentMetrics.strong-weight;
+            overflow: elide;
+        }
+        pane-header { }
+    }
+
+    drawer := OverlayHost {
+        area: root.viewport;
+        active: root.active && root.pane-visible && !root.top-mode && !root.inline-mode;
+        dismiss-on-resize: false;
+        left-pane-transition: true;
+        retained-pane-width: root.rail-width;
+        positioned-panel: { x: root.view-bounds.x, y: root.view-bounds.y, width: root.drawer-width, height: root.height };
+        scrim-bounds: root.view-bounds;
+        scrim-fill: FluentTheme.navigation-light-dismiss;
+        square-top: true;
+        square-bottom: true;
+        acrylic: true;
+        luminosity-acrylic: true;
+
+        drawer-toggle := NavigationIconButton {
+            x: toggle.x;
+            y: toggle.y;
+            width: toggle.width;
+            height: toggle.height;
+            icon: root.minimal ? @image-url("icons/fluent/dismiss-20-regular.svg") : @image-url("icons/fluent/navigation-20-regular.svg");
+            label: "Close navigation pane";
+            accessible-expanded: true;
+            activated => { drawer.dismiss-with-transition(); }
+        }
+        if root.pane-title != "" : FluentText {
+            x: drawer-toggle.x + drawer-toggle.width + FluentMetrics.navigation-item-inset-x;
+            y: 0px;
+            width: max(0px, drawer.panel-bounds.width - self.x - FluentMetrics.navigation-item-inset-x);
+            height: root.header-height;
+            vertical-alignment: center;
+            text: root.pane-title;
+            font-weight: FluentMetrics.strong-weight;
+            overflow: elide;
+        }
+        NavigationPaneGroup {
+            x: 0px;
+            y: root.left-header-height;
+            // Overlay content is sized against the panel rather than the host placeholder.
+            width: drawer.panel-bounds.width;
+            height: max(0px, drawer.panel-bounds.height - self.y);
+            show-labels: true;
+            label-opacity: drawer.pane-reveal;
+            items: root.items;
+            icons: root.icons;
+            details: root.item-details;
+            expanded: root.expanded-items;
+            footer-start: root.footer-start;
+            minimum-target: root.minimum-target;
+            selected-index: root.selected-index;
+            selection-follows-focus: root.selection-follows-focus;
+            item-invoked(index, bounds) => { root.invoke(index, false, bounds); }
+            branch-toggled(index, bounds) => { root.toggle-branch(index, bounds); }
+            item-focused(index) => { root.select(index, false); }
+        }
+    }
+
+    children-flyout := OverlayHost {
+        active: root.active && root.pane-visible && root.child-indices.length > 0;
+        area: root.viewport;
+        anchor: { x: root.child-anchor.x, y: root.child-anchor.y };
+        anchor-width: root.child-anchor.width;
+        anchor-height: root.child-anchor.height;
+        preferred-placement: root.top-mode ? bottom : right;
+        preferred-panel-width: min(root.open-pane-width, FluentMetrics.flyout-max-width);
+        preferred-panel-height: min(FluentMetrics.flyout-max-height,
+            FluentMetrics.navigation-row-step(root.minimum-target) * root.child-indices.length + 2 * FluentMetrics.navigation-item-inset-y);
+        anchor-gap: 0px;
+        acrylic: true;
+        luminosity-acrylic: true;
+        flyout-transition: true;
+
+        NavigationPane {
+            x: FluentMetrics.control-stroke;
+            y: FluentMetrics.navigation-item-inset-y;
+            width: max(0px, children-flyout.panel-bounds.width - 2 * self.x);
+            height: max(0px, children-flyout.panel-bounds.height - 2 * self.y);
+            items: root.items;
+            icons: root.icons;
+            details: root.item-details;
+            expanded: root.expanded-items;
+            root-parent: root.child-parent;
+            indices: root.child-indices;
+            minimum-target: root.minimum-target;
+            selected-index: root.selected-index;
+            show-labels: true;
+            overflow-style: true;
+            item-invoked(index, bounds) => { root.invoke(index, false, bounds); }
+            branch-toggled(index, bounds) => { root.toggle-branch(index, bounds); }
+        }
+    }
+}

@@ -1,0 +1,246 @@
+import { Button, ButtonVariant } from "button.slint";
+import { OverlayArea, OverlayHost } from "overlay-host.slint";
+import { FluentText } from "primitives.slint";
+import { FluentScrollView } from "scroll-view.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export enum ContentDialogButton { none, primary, secondary, close }
+export enum ContentDialogResult { none, primary, secondary }
+
+component DialogCommandButton inherits Button {
+    in property <bool> initial-focus;
+    callback received-focus;
+    init => {
+        if (self.initial-focus) {
+            self.focus();
+            if (self.has-focus) { self.received-focus(); }
+        }
+    }
+    focus-changed-event => { if (self.has-focus) { self.received-focus(); } }
+}
+
+export component ContentDialog {
+    in property <OverlayArea> viewport;
+    in property <string> title;
+    in property <string> message;
+    in property <string> primary-text;
+    in property <string> secondary-text;
+    in property <string> close-text;
+    in property <bool> primary-enabled: true;
+    in property <bool> secondary-enabled: true;
+    in property <ContentDialogButton> default-button;
+    in property <length> requested-width: FluentMetrics.dialog-min-width;
+    in property <length> requested-height: FluentMetrics.dialog-min-height;
+    in property <length> minimum-target;
+    // A focusable element in the body slot can take focus during its init.
+    in property <bool> content-takes-initial-focus;
+    out property <bool> open: host.open;
+    out property <ContentDialogButton> focused-command;
+    out property <OverlayArea> panel-bounds: host.panel-bounds;
+    callback closing(ContentDialogResult) -> bool;
+    callback closed(ContentDialogResult);
+    closing(result) => { return true; }
+
+    property <bool> finishing;
+    property <bool> notify-closed;
+    property <ContentDialogResult> pending-result;
+    property <length> stroke: FluentTheme.high-contrast ? FluentMetrics.focus-outer-stroke : FluentMetrics.control-stroke;
+    property <ContentDialogButton> initial-command: root.content-takes-initial-focus ? ContentDialogButton.none
+        : root.command-available(root.default-button) ? root.default-button
+        : root.command-available(ContentDialogButton.primary) ? ContentDialogButton.primary
+        : root.command-available(ContentDialogButton.secondary) ? ContentDialogButton.secondary
+        : root.command-available(ContentDialogButton.close) ? ContentDialogButton.close : ContentDialogButton.none;
+
+    public function show() { host.show(); }
+    public function hide() { root.finish(ContentDialogResult.none); }
+
+    function finish(result: ContentDialogResult) {
+        if (root.open && !root.finishing && !host.closing) {
+            root.finishing = true;
+            if (root.closing(result)) {
+                root.pending-result = result;
+                root.notify-closed = true;
+                host.dismiss-with-transition();
+            }
+            root.finishing = false;
+        }
+    }
+
+    changed open => {
+        if (!root.open) {
+            root.focused-command = ContentDialogButton.none;
+            if (root.notify-closed) {
+                root.notify-closed = false;
+                root.closed(root.pending-result);
+            }
+        }
+    }
+
+    pure function command-available(command: ContentDialogButton) -> bool {
+        return command == ContentDialogButton.primary ? root.primary-text != "" && root.primary-enabled
+            : command == ContentDialogButton.secondary ? root.secondary-text != "" && root.secondary-enabled
+            : command == ContentDialogButton.close && root.close-text != "";
+    }
+
+    function execute(command: ContentDialogButton) {
+        if (root.command-available(command)) {
+            root.finish(command == ContentDialogButton.primary ? ContentDialogResult.primary
+                : command == ContentDialogButton.secondary ? ContentDialogResult.secondary : ContentDialogResult.none);
+        }
+    }
+
+    host := OverlayHost {
+        area: root.viewport;
+        modal: true;
+        scale-transition: true;
+        dismiss-on-resize: false;
+        dismiss-on-escape: false;
+        focus-scope-on-open: !root.content-takes-initial-focus && root.initial-command == ContentDialogButton.none;
+        surface-fill: FluentTheme.page;
+        surface-stroke: FluentTheme.dialog-stroke;
+        scrim-fill: FluentTheme.dialog-scrim;
+        preferred-panel-width: clamp(root.requested-width, FluentMetrics.dialog-min-width, FluentMetrics.dialog-max-width);
+        preferred-panel-height: clamp(root.requested-height, FluentMetrics.dialog-min-height, FluentMetrics.dialog-max-height);
+
+        scope := FocusScope {
+            x: root.stroke;
+            y: root.stroke;
+            width: max(0px, host.panel-bounds.width - 2 * self.x);
+            height: max(0px, host.panel-bounds.height - 2 * self.y);
+            focus-on-tab-navigation: false;
+            focus-on-click: false;
+            accessible-role: groupbox;
+            accessible-label: root.title;
+
+            key-pressed(event) => {
+                if (event.text == Key.Tab || event.text == Key.Backtab) { return reject; }
+                if (!event.repeat && event.text == Key.Escape) { root.hide(); }
+                if (!event.repeat && event.text == Key.Return) { root.execute(root.default-button); }
+                // Child controls get first refusal. Unhandled keys stop here.
+                return accept;
+            }
+
+            property <length> pad-x: min(FluentMetrics.dialog-padding, self.width / 12);
+            property <length> pad-y: min(FluentMetrics.dialog-padding, self.height / 5);
+
+            body := Rectangle {
+                x: 0px;
+                y: 0px;
+                width: 100%;
+                height: max(0px, scope.height - commands.height);
+                background: FluentTheme.dialog-content-fill;
+
+                body-scroll := FluentScrollView {
+                    x: 0px;
+                    y: 0px;
+                    width: 100%;
+                    height: max(0px, body.height - divider.height);
+                    vertical-scrollbar: false;
+                    content-height: max(self.height, header.preferred-height);
+
+                    header := VerticalLayout {
+                        x: 0px;
+                        y: 0px;
+                        width: body-scroll.content-width;
+                        height: self.preferred-height;
+                        padding-left: scope.pad-x;
+                        padding-right: scope.pad-x;
+                        padding-top: scope.pad-y;
+                        padding-bottom: scope.pad-y;
+                        spacing: FluentMetrics.dialog-title-margin;
+
+                        if root.title != "" : FluentText {
+                            text: root.title;
+                            font-size: FluentMetrics.dialog-title-size;
+                            font-weight: FluentMetrics.strong-weight;
+                            wrap: word-wrap;
+                            max-lines: 2;
+                            overflow: elide;
+                        }
+                        if root.message != "" : FluentText {
+                            text: root.message;
+                            wrap: word-wrap;
+                        }
+                        @children
+                    }
+                }
+
+                divider := Rectangle {
+                    y: parent.height - self.height;
+                    width: parent.width;
+                    height: commands.height > 0px ? FluentMetrics.control-stroke : 0px;
+                    background: FluentTheme.card-stroke;
+                }
+            }
+
+            commands := Rectangle {
+                y: scope.height - self.height;
+                width: scope.width;
+                height: count == 0 ? 0px : min(scope.height, 2 * scope.pad-y + max(
+                    primary.visible ? primary.preferred-height : 0px,
+                    secondary.visible ? secondary.preferred-height : 0px,
+                    close.visible ? close.preferred-height : 0px));
+                property <int> count: (primary.visible ? 1 : 0) + (secondary.visible ? 1 : 0) + (close.visible ? 1 : 0);
+                property <length> command-width: max(0px, (self.width - 2 * scope.pad-x
+                    - max(0, count - 1) * FluentMetrics.spacing-medium) / max(1, count));
+                property <length> step: command-width + FluentMetrics.spacing-medium;
+                property <ContentDialogButton> focused: primary.has-focus ? ContentDialogButton.primary
+                    : secondary.has-focus ? ContentDialogButton.secondary
+                    : close.has-focus ? ContentDialogButton.close : ContentDialogButton.none;
+                property <bool> outside-commands: focused == ContentDialogButton.none;
+                changed focused => { root.focused-command = self.focused; }
+
+                primary := DialogCommandButton {
+                    x: scope.pad-x;
+                    y: scope.pad-y;
+                    width: commands.command-width;
+                    height: max(0px, commands.height - 2 * self.y);
+                    text: root.primary-text;
+                    visible: self.text != "";
+                    enabled: self.visible && root.primary-enabled;
+                    initial-focus: root.initial-command == ContentDialogButton.primary;
+                    received-focus => { root.focused-command = ContentDialogButton.primary; }
+                    wrap-text: true;
+                    minimum-target: root.minimum-target;
+                    variant: root.default-button == ContentDialogButton.primary && (self.has-focus || commands.outside-commands)
+                        ? ButtonVariant.accent : ButtonVariant.standard;
+                    clicked => { root.execute(ContentDialogButton.primary); }
+                }
+
+                secondary := DialogCommandButton {
+                    x: scope.pad-x + (primary.visible ? commands.step : 0px);
+                    y: scope.pad-y;
+                    width: commands.command-width;
+                    height: max(0px, commands.height - 2 * self.y);
+                    text: root.secondary-text;
+                    visible: self.text != "";
+                    enabled: self.visible && root.secondary-enabled;
+                    initial-focus: root.initial-command == ContentDialogButton.secondary;
+                    received-focus => { root.focused-command = ContentDialogButton.secondary; }
+                    wrap-text: true;
+                    minimum-target: root.minimum-target;
+                    variant: root.default-button == ContentDialogButton.secondary && (self.has-focus || commands.outside-commands)
+                        ? ButtonVariant.accent : ButtonVariant.standard;
+                    clicked => { root.execute(ContentDialogButton.secondary); }
+                }
+
+                close := DialogCommandButton {
+                    x: scope.pad-x + ((primary.visible ? 1 : 0) + (secondary.visible ? 1 : 0)) * commands.step;
+                    y: scope.pad-y;
+                    width: commands.command-width;
+                    height: max(0px, commands.height - 2 * self.y);
+                    text: root.close-text;
+                    visible: self.text != "";
+                    enabled: self.visible;
+                    initial-focus: root.initial-command == ContentDialogButton.close;
+                    received-focus => { root.focused-command = ContentDialogButton.close; }
+                    wrap-text: true;
+                    minimum-target: root.minimum-target;
+                    variant: root.default-button == ContentDialogButton.close && (self.has-focus || commands.outside-commands)
+                        ? ButtonVariant.accent : ButtonVariant.standard;
+                    clicked => { root.execute(ContentDialogButton.close); }
+                }
+            }
+        }
+    }
+}

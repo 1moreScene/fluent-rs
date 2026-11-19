@@ -1,0 +1,447 @@
+import { FluentFocusScope, FluentPointerArea } from "interaction.slint";
+import { ItemData } from "item-presenter.slint";
+import { OverlayArea } from "overlay-placement.slint";
+import { FluentFocusRing, FluentText } from "primitives.slint";
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { FluentScrollView } from "scroll-view.slint";
+import { ListDirection, ListSelectionMode, SelectionLogic, SelectionModel } from "selection-model.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+export { ListSelectionMode }
+
+export struct GridCell {
+    index: int,
+    bounds: OverlayArea,
+    item: ItemData,
+    enabled: bool,
+    selected: bool,
+    keyboard-focused: bool,
+    show-checkbox: bool,
+}
+
+export struct GridItemContent {
+    width: length,
+    height: length,
+    corner-radius: length,
+    background: brush,
+    border-width: length,
+    border-color: color,
+}
+
+export global GridNavigation {
+    pure callback step([ItemData], int, int) -> int;
+}
+
+// Use as the outer surface of a custom template. Its children provide the
+// contents of the cell while the presenter owns gestures, theme and semantics.
+export component GridViewItem inherits Rectangle {
+    in property <GridCell> cell;
+    callback activated(int, bool, bool);
+    callback selection-toggled(int);
+    property <int> pressed-index: -1;
+    property <bool> control-held;
+    property <bool> shift-held;
+    property <bool> hovered: pointer.pointer-inside;
+    property <bool> pressed: pointer.pressed-inside && root.pressed-index == root.cell.index;
+    property <length> select-stroke: FluentMetrics.grid-selection-stroke;
+    property <color> selection-stroke: FluentTheme.high-contrast ? FluentTheme.contrast-highlight
+        : !root.cell.enabled ? FluentTheme.accent-fill-disabled
+        : root.pressed ? FluentTheme.accent-fill-pressed
+        : root.hovered ? FluentTheme.accent-fill-hover : FluentTheme.accent-fill;
+    out property <color> foreground: !root.cell.enabled ? FluentTheme.text-disabled
+        : root.hovered && !root.cell.selected ? FluentTheme.text-secondary : FluentTheme.text-primary;
+
+    x: root.cell.bounds.x;
+    y: root.cell.bounds.y;
+    width: root.cell.bounds.width;
+    height: root.cell.bounds.height;
+    border-radius: FluentMetrics.control-radius;
+    background: FluentTheme.high-contrast ? FluentTheme.contrast-surface
+        : root.cell.selected ? (root.pressed || !root.cell.enabled ? FluentTheme.subtle-fill-hover : FluentTheme.subtle-fill-pressed)
+        : root.pressed ? FluentTheme.subtle-fill-pressed
+        : root.hovered ? FluentTheme.subtle-fill-hover : transparent;
+    accessible-role: list-item;
+    accessible-label: root.cell.item.text;
+    accessible-enabled: root.cell.enabled;
+    accessible-item-index: root.cell.index;
+    accessible-item-selected: root.cell.selected;
+    accessible-checkable: root.cell.show-checkbox;
+    accessible-checked: root.cell.show-checkbox && root.cell.selected;
+    accessible-action-default => { if (root.cell.enabled) { root.activated(root.cell.index, false, false); } }
+
+    pointer := FluentPointerArea {
+        width: 100%;
+        height: 100%;
+        enabled: root.cell.enabled;
+        interaction-event(event) => {
+            if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                root.pressed-index = root.cell.index;
+                root.control-held = event.modifiers.control || event.modifiers.meta;
+                root.shift-held = event.modifiers.shift;
+            }
+            if (event.kind == PointerEventKind.cancel) { root.pressed-index = -1; }
+        }
+        clicked => {
+            if (root.pressed-index == root.cell.index) {
+                root.pressed-index = -1;
+                root.activated(root.cell.index, root.control-held, root.shift-held);
+            }
+        }
+    }
+
+    @children
+
+    if root.cell.selected : Rectangle {
+        x: root.select-stroke;
+        y: self.x;
+        width: max(0px, parent.width - 2 * self.x);
+        height: max(0px, parent.height - 2 * self.y);
+        border-radius: max(0px, FluentMetrics.control-radius - self.x);
+        border-width: FluentMetrics.control-stroke;
+        border-color: FluentTheme.high-contrast ? FluentTheme.contrast-text : FluentTheme.control-solid-fill;
+    }
+    if root.cell.selected : Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: FluentMetrics.control-radius;
+        border-width: root.select-stroke;
+        border-color: root.selection-stroke;
+    }
+    if root.cell.keyboard-focused : FluentFocusRing {
+        x: FluentMetrics.focus-outset;
+        y: FluentMetrics.focus-outset;
+        width: max(0px, parent.width - 2 * self.x);
+        height: max(0px, parent.height - 2 * self.y);
+    }
+
+
+    if root.cell.show-checkbox : FluentPointerArea {
+        x: max(0px, parent.width - self.width - self.y);
+        y: FluentMetrics.spacing-small;
+        width: FluentMetrics.grid-checkbox-size;
+        height: self.width;
+        enabled: root.cell.enabled;
+        property <int> captured-index: -1;
+        interaction-event(event) => {
+            if (event.kind == PointerEventKind.down) { self.captured-index = root.cell.index; }
+            if (event.kind == PointerEventKind.cancel) { self.captured-index = -1; }
+        }
+        clicked => {
+            if (self.captured-index == root.cell.index) { root.selection-toggled(root.cell.index); }
+            self.captured-index = -1;
+        }
+
+        Rectangle {
+            width: 100%;
+            height: 100%;
+            border-radius: FluentMetrics.grid-checkbox-radius;
+            border-width: FluentMetrics.control-stroke;
+            border-color: root.cell.selected && !FluentTheme.high-contrast ? root.selection-stroke
+                : FluentTheme.high-contrast ? FluentTheme.contrast-text : FluentTheme.control-strong-stroke;
+            background: root.cell.selected ? root.selection-stroke
+                : FluentTheme.high-contrast ? FluentTheme.contrast-surface : FluentTheme.control-on-image-fill;
+        }
+        if root.cell.selected : FluentSystemIcon {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            source: @image-url("icons/fluent/checkmark-16-regular.svg");
+            foreground: FluentTheme.high-contrast ? FluentTheme.contrast-highlight-text : FluentTheme.accent-text;
+        }
+    }
+}
+
+export component GridView inherits FluentFocusScope {
+    // Slint slots are single insertion points. Repeat the visible cells inside
+    // this one layer to supply a template using arbitrary application data.
+    slot item-template;
+    // Disable the built-in text entries when providing the custom layer.
+    in property <bool> use-default-item-template: true;
+    in property <[ItemData]> items;
+    in property <string> label;
+    in property <string> empty-text;
+    in property <bool> active: true;
+    in property <bool> focus-on-init;
+    in property <bool> item-click-enabled;
+    in property <bool> show-selection-checkboxes: true;
+    in property <bool> single-selection-follows-focus: true;
+    in property <ListSelectionMode> selection-mode;
+    in property <Orientation> orientation: Orientation.horizontal;
+    in property <int> maximum-rows-or-columns;
+    in property <length> item-width: FluentMetrics.grid-min-cell-size;
+    in property <length> item-height: FluentMetrics.grid-min-cell-size;
+    in property <length> minimum-target;
+    in property <length> column-gap: FluentMetrics.spacing-small;
+    in property <length> row-gap: FluentMetrics.spacing-small;
+    in property <length> content-padding-left;
+    in property <length> content-padding-top;
+    in property <length> content-padding-right;
+    in property <length> content-padding-bottom: FluentMetrics.grid-bottom-padding;
+    out property <[int]> selected: selection.selected;
+    out property <int> selected-index: selection.selected-index;
+    out property <int> focused-index: root.has-focus ? root.current : -1;
+    out property <length> scroll-offset: root.row-first ? viewport.vertical-offset : viewport.horizontal-offset;
+    out property <length> scroll-extent: root.axis-extent;
+    out property <int> lane-count: min(50000, max(1, min(root.wrap-limit, floor(root.available-cross / root.cross-pitch))));
+    out property <int> first-realized-index: min(root.item-count, root.first-line * root.lane-count);
+    out property <int> realized-count: root.active && root.width > 0px && root.height > 0px
+        ? max(0, min(root.item-count, root.end-line * root.lane-count) - root.first-realized-index) : 0;
+    callback item-clicked(int);
+    callback selection-changed;
+    // Optional centered content for the built-in item presenter. An empty
+    // size uses the item's text. The item label remains available to AT.
+    pure callback item-content(int) -> GridItemContent;
+
+    property <bool> row-first: root.orientation == Orientation.horizontal;
+    property <length> cell-width: max(FluentMetrics.grid-min-cell-size, root.minimum-target, root.item-width);
+    property <length> cell-height: max(FluentMetrics.grid-min-cell-size, root.minimum-target, root.item-height);
+    property <length> pitch-x: root.cell-width + max(0px, root.column-gap);
+    property <length> pitch-y: root.cell-height + max(0px, root.row-gap);
+    property <length> available-cross: root.row-first ? root.width - root.content-padding-left - root.content-padding-right
+        : root.height - root.content-padding-top - root.content-padding-bottom;
+    property <length> cross-pitch: root.row-first ? root.pitch-x : root.pitch-y;
+    property <length> axis-pitch: root.row-first ? root.pitch-y : root.pitch-x;
+    property <length> axis-start: root.row-first ? root.content-padding-top : root.content-padding-left;
+    property <length> axis-end: root.row-first ? root.content-padding-bottom : root.content-padding-right;
+    property <length> axis-view: root.row-first ? root.height : root.width;
+    property <length> axis-extent: root.axis-start + root.line-count * root.axis-pitch + root.axis-end;
+    property <int> wrap-limit: root.maximum-rows-or-columns > 0 ? root.maximum-rows-or-columns : 50000;
+    property <int> line-count: ceil(root.item-count / root.lane-count);
+    property <int> first-line: clamp(floor((root.scroll-offset - root.axis-start) / root.axis-pitch) - 1, 0, root.line-count);
+    property <int> end-line: clamp(ceil((root.scroll-offset + root.axis-view - root.axis-start) / root.axis-pitch) + 1, 0, root.line-count);
+    property <int> item-count: root.items.length;
+    property <int> current: -1;
+    property <string> activation-key;
+
+    focus-on-click: false;
+    focus-on-tab-navigation: root.active && root.item-count > 0;
+    accessible-role: list;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled && root.active;
+    accessible-item-count: root.item-count;
+    accessible-delegate-focus: root.focused-index;
+
+    init => { if (root.focus-on-init && root.active && root.enabled) { root.focus-item(root.selected-index); } }
+    focus-changed-event => {
+        if (root.has-focus && !root.can-focus(root.current)) { root.move-to(root.start-index()); }
+    }
+    focus-left => { root.activation-key = ""; }
+    changed items => { root.reset-view(); }
+    changed item-count => { root.reset-view(); }
+    changed lane-count => { if (root.has-focus) { root.bring-into-view(root.current); } }
+    changed orientation => {
+        root.set-offset(0px);
+        if (root.has-focus) { root.bring-into-view(root.current); }
+    }
+    changed scroll-extent => {
+        if (root.scroll-offset > root.scroll-extent - root.axis-view) { root.set-offset(root.scroll-offset); }
+    }
+
+    selection := SelectionModel {
+        items: root.items;
+        mode: root.selection-mode;
+        changed-by-user => { root.selection-changed(); }
+    }
+
+    public function clear-selection() { selection.clear(); }
+    public function set-selected-index(index: int) { selection.set-index(index); }
+
+    public pure function item-bounds(index: int) -> OverlayArea {
+        let line = floor(index / root.lane-count);
+        let cross = mod(index, root.lane-count);
+        return {
+            x: root.content-padding-left + (root.row-first ? cross : line) * root.pitch-x,
+            y: root.content-padding-top + (root.row-first ? line : cross) * root.pitch-y,
+            width: root.cell-width, height: root.cell-height,
+        };
+    }
+
+    public pure function cell-at(slot-index: int) -> GridCell {
+        let index = root.first-realized-index + slot-index;
+        let item = root.items[index];
+        return {
+            index: index, item: item, bounds: root.item-bounds(index),
+            enabled: root.enabled && root.active && !item.disabled,
+            selected: SelectionLogic.contains(root.selected, index),
+            keyboard-focused: root.focus-visible && root.current == index,
+            show-checkbox: root.selection-mode == ListSelectionMode.multiple && root.show-selection-checkboxes,
+        };
+    }
+
+    public function scroll-to-offset(offset: length) { root.set-offset(offset); }
+    public function scroll-to-index(index: int) { root.bring-into-view(index); }
+    public function focus-item(index: int) {
+        if (root.enabled && root.active) {
+            root.move-to(root.can-focus(index) ? index : root.start-index());
+            root.focus();
+        }
+    }
+
+    public function activate-item(index: int, control: bool, shift: bool) {
+        if (root.operable(index)) {
+            let from = root.current;
+            root.use-pointer-focus();
+            root.move-to(index);
+            root.focus();
+            root.activate(index, from, control, shift);
+        }
+    }
+
+    public function toggle-item(index: int) {
+        if (root.operable(index)) {
+            root.use-pointer-focus();
+            root.move-to(index);
+            root.focus();
+            selection.activate(index, true);
+        }
+    }
+
+    pure function can-focus(index: int) -> bool {
+        return index >= 0 && index < root.item-count && !root.items[index].disabled;
+    }
+    pure function operable(index: int) -> bool {
+        return root.enabled && root.active && root.can-focus(index);
+    }
+    pure function start-index() -> int {
+        return root.can-focus(root.selected-index) ? root.selected-index
+            : SelectionLogic.target(root.items, -1, ListDirection.first);
+    }
+    function reset-view() {
+        root.activation-key = "";
+        root.current = root.has-focus ? root.start-index() : -1;
+        root.set-offset(0px);
+    }
+    function set-offset(offset: length) {
+        let next = clamp(offset, 0px, max(0px, root.axis-extent - root.axis-view));
+        viewport.scroll-to({ x: root.row-first ? 0px : next, y: root.row-first ? next : 0px }, ScrollBehavior.instant);
+    }
+    function bring-into-view(index: int) {
+        if (index < 0 || index >= root.item-count) { return; }
+        let first = root.axis-start + floor(index / root.lane-count) * root.axis-pitch;
+        let length = root.row-first ? root.cell-height : root.cell-width;
+        if (first < root.scroll-offset || length >= root.axis-view) { root.set-offset(first); }
+        else if (first + length > root.scroll-offset + root.axis-view) {
+            root.set-offset(first + length - root.axis-view);
+        }
+    }
+    function move-to(index: int) {
+        root.current = index;
+        root.bring-into-view(index);
+    }
+    function activate(index: int, from: int, control: bool, shift: bool) {
+        if (root.item-click-enabled) { root.item-clicked(index); }
+        if (root.selection-mode == ListSelectionMode.none || !root.operable(index)) { return; }
+        if (shift && root.selection-mode != ListSelectionMode.single) {
+            selection.extend(index, from, control || root.selection-mode == ListSelectionMode.multiple);
+        } else {
+            selection.activate(index, root.selection-mode == ListSelectionMode.multiple
+                || (control && root.selection-mode == ListSelectionMode.extended));
+        }
+    }
+    function navigate(index: int, control: bool, shift: bool) {
+        if (index < 0 || root.current == index) { return; }
+        let from = root.current;
+        root.use-keyboard-focus();
+        root.move-to(index);
+        if (root.selection-mode == ListSelectionMode.none) { return; }
+        if (shift && root.selection-mode != ListSelectionMode.single) {
+            selection.extend(index, from, control || root.selection-mode == ListSelectionMode.multiple);
+        } else if (root.selection-mode == ListSelectionMode.multiple) {
+            selection.mark-anchor(index);
+        } else if (!control && (root.selection-mode == ListSelectionMode.extended || root.single-selection-follows-focus)) {
+            selection.activate(index, false);
+        }
+    }
+
+    key-pressed(event) => {
+        if (!root.enabled || !root.active || root.item-count == 0 || event.modifiers.alt) { return reject; }
+        if (event.text == Key.Space || event.text == Key.Return) {
+            if (!event.repeat) { root.activation-key = event.text; root.use-keyboard-focus(); }
+            return accept;
+        }
+        let control = event.modifiers.control || event.modifiers.meta;
+        if (control && (event.text == "a" || event.text == "A")
+            && (root.selection-mode == ListSelectionMode.multiple || root.selection-mode == ListSelectionMode.extended)) {
+            if (!event.repeat) { selection.select-all(); }
+            return accept;
+        }
+        if (event.text == Key.Home || event.text == Key.End) {
+            let target = SelectionLogic.target(root.items, -1, event.text == Key.Home ? ListDirection.first : ListDirection.last);
+            root.navigate(target, control, event.modifiers.shift);
+            return accept;
+        }
+        let page = event.text == Key.PageDown || event.text == Key.PageUp;
+        let horizontal-key = event.text == Key.LeftArrow || event.text == Key.RightArrow;
+        if (!page && !horizontal-key && event.text != Key.UpArrow && event.text != Key.DownArrow) { return reject; }
+        let backwards = event.text == Key.LeftArrow || event.text == Key.UpArrow || event.text == Key.PageUp;
+        let direction = backwards ? -1 : 1;
+        let step = (page || (horizontal-key != root.row-first)) ? root.lane-count : 1;
+        let page-size = page ? max(1, floor(root.axis-view / root.axis-pitch)) : 1;
+        let target = !root.can-focus(root.current) ? root.start-index()
+            : GridNavigation.step(root.items, root.current + direction * step * (page-size - 1), direction * step);
+        root.navigate(target >= 0 || !page ? target : SelectionLogic.target(root.items, -1,
+            backwards ? ListDirection.first : ListDirection.last), control, event.modifiers.shift);
+        return accept;
+    }
+
+    key-released(event) => {
+        if (root.activation-key != "" && event.text == root.activation-key) {
+            root.activation-key = "";
+            if (root.operable(root.current)) {
+                root.activate(root.current, root.current, event.modifiers.control || event.modifiers.meta, event.modifiers.shift);
+            }
+            return accept;
+        }
+        return reject;
+    }
+
+    viewport := FluentScrollView {
+        width: 100%;
+        height: 100%;
+        content-width: root.row-first ? root.width : max(root.width, root.axis-extent);
+        content-height: root.row-first ? max(root.height, root.axis-extent) : root.height;
+        vertical-scrollbar: root.row-first;
+        horizontal-scrollbar: !root.row-first;
+        vertical-line-step: root.pitch-y;
+        horizontal-line-step: root.pitch-x;
+        mouse-drag-pan-enabled: false;
+
+        for slot-index in root.use-default-item-template ? root.realized-count : 0 : entry := GridViewItem {
+            property <GridItemContent> item-content: root.item-content(self.cell.index);
+            property <bool> has-item-content: self.item-content.width > 0px && self.item-content.height > 0px;
+            cell: root.cell-at(slot-index);
+            activated(index, control, shift) => { root.activate-item(index, control, shift); }
+            selection-toggled(index) => { root.toggle-item(index); }
+            if entry.has-item-content : Rectangle {
+                width: min(parent.width, parent.item-content.width);
+                height: min(parent.height, parent.item-content.height);
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                border-radius: parent.item-content.corner-radius;
+                background: parent.item-content.background;
+                border-width: parent.item-content.border-width;
+                border-color: parent.item-content.border-color;
+            }
+            if !entry.has-item-content : FluentText {
+                x: FluentMetrics.spacing-small;
+                width: max(0px, parent.width - 2 * self.x);
+                height: parent.height;
+                text: parent.cell.item.text;
+                color: parent.foreground;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+        }
+        item-template {}
+    }
+
+    if root.item-count == 0 && root.empty-text != "" : FluentText {
+        width: 100%;
+        height: 100%;
+        text: root.empty-text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: FluentTheme.text-secondary;
+        accessible-role: none;
+    }
+}

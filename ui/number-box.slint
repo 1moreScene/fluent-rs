@@ -1,0 +1,256 @@
+import { NumberBoxAction, NumberBoxSpinButtonPlacement, NumberBoxValidationMode, NumberBoxRequest, NumberBoxResult, NumberBoxLogic } from "number-box-logic.slint";
+export { NumberBoxAction, NumberBoxSpinButtonPlacement, NumberBoxValidationMode, NumberBoxRequest, NumberBoxResult, NumberBoxLogic }
+import { ButtonState } from "interaction.slint";
+import { RepeatButton } from "repeat-button.slint";
+import { TextBox, TextBoxActionSurface, TextBoxState } from "text-box.slint";
+import { OverlayHost, OverlayArea } from "overlay-host.slint";
+import { FluentText, FluentIcon } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+component NumberSpinButton inherits Rectangle {
+    in property <bool> enabled: true;
+    in property <bool> active;
+    in property <bool> up;
+    in property <bool> popup;
+    out property <bool> repeating: repeat.repeating;
+    callback clicked;
+    TextBoxActionSurface {
+        width: 100%; height: 100%;
+        right-inset: 0px; vertical-inset: 0px;
+        hovered: repeat.hovered && root.enabled;
+        pressed: repeat.pressed && root.enabled;
+        FluentIcon {
+            width: root.popup ? FluentMetrics.number-popup-icon-size : FluentMetrics.small-chevron-size;
+            height: self.width;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            viewbox-width: 12; viewbox-height: 12;
+            commands: root.up ? "M 2 8 L 6 4 L 10 8" : "M 2 4 L 6 8 L 10 4";
+            stroke: !root.enabled ? FluentTheme.text-disabled
+                : FluentTheme.high-contrast && repeat.hovered ? FluentTheme.contrast-highlight-text
+                : repeat.pressed ? FluentTheme.text-tertiary : FluentTheme.text-secondary;
+            stroke-line-cap: round; stroke-line-join: round;
+        }
+    }
+    repeat := RepeatButton {
+        width: 100%; height: 100%;
+        show-standard-surface: false;
+        enabled: root.enabled; active: root.active;
+        focus-on-press: false; focus-on-click: false; focus-on-tab-navigation: false;
+        accessible-label: root.up ? @tr("Increase value") : @tr("Decrease value");
+        clicked => { root.clicked(); }
+    }
+}
+
+export component NumberBox inherits FocusScope {
+    in-out property <string> value;
+    in-out property <string> text <=> field.text;
+    in-out property <string> minimum;
+    in-out property <string> maximum;
+    in property <string> small-change: "1";
+    in property <string> large-change: "10";
+    in property <bool> wrap;
+    in property <bool> accepts-expression;
+    in property <NumberBoxValidationMode> validation-mode;
+    in property <NumberBoxSpinButtonPlacement> spin-button-placement;
+    in property <string> decimal-separator: ".";
+    in property <int> minimum-fraction-digits;
+    in property <string> header;
+    in property <string> description;
+    in property <string> placeholder-text;
+    in property <string> accessible-name: root.header;
+    in property <bool> active: true;
+    in property <length> minimum-target;
+    in property <OverlayArea> viewport;
+    out property <bool> editor-focused: field.has-focus;
+    out property <bool> has-selection: field.has-selection;
+    out property <bool> open: popup.open;
+    out property <bool> up-enabled: root.enabled && root.active && root.result.up-enabled;
+    out property <bool> down-enabled: root.enabled && root.active && root.result.down-enabled;
+    out property <bool> repeating: inline-up.repeating || inline-down.repeating;
+    out property <string> configuration-error: root.result.error;
+    out property <TextBoxState> state: field.state;
+    out property <OverlayArea> input-bounds: { x: field.absolute-position.x, y: field.absolute-position.y, width: field.width, height: field.height };
+    out property <OverlayArea> panel-bounds: popup.panel-bounds;
+    out property <Point> up-center: root.open ? {x: popup.panel-bounds.x + popup.panel-bounds.width / 2, y: popup.panel-bounds.y + root.popup-inset + root.popup-button-size / 2}
+        : {x:inline-up.absolute-position.x + inline-up.width / 2, y:inline-up.absolute-position.y + inline-up.height / 2};
+    out property <Point> down-center: root.open ? {x: popup.panel-bounds.x + popup.panel-bounds.width / 2, y: popup.panel-bounds.y + root.popup-inset + root.popup-button-size * 1.5 + FluentMetrics.spacing-small}
+        : {x:inline-down.absolute-position.x + inline-down.width / 2, y:inline-down.absolute-position.y + inline-down.height / 2};
+    callback value-changed(string, string);
+
+    property <bool> logic-ready: NumberBoxLogic.ready;
+    property <NumberBoxResult> result;
+    property <string> last-value;
+    property <string> last-text;
+    property <string> last-minimum;
+    property <string> last-maximum;
+    property <bool> inline: root.spin-button-placement == NumberBoxSpinButtonPlacement.inline;
+    property <bool> compact: root.spin-button-placement == NumberBoxSpinButtonPlacement.compact;
+    property <length> inline-button-width: max(FluentMetrics.number-inline-button-width, root.minimum-target);
+    property <length> spin-column: root.inline ? 2 * root.inline-button-width + 2 * FluentMetrics.spacing-small
+        : root.compact ? FluentMetrics.number-compact-indicator-width : 0px;
+    property <length> popup-button-size: max(FluentMetrics.number-popup-button-size, root.minimum-target);
+    property <length> popup-inset: FluentMetrics.number-popup-padding + FluentMetrics.control-stroke;
+    property <length> popup-width: root.popup-button-size + 2 * root.popup-inset;
+    property <length> popup-height: 2 * root.popup-button-size + FluentMetrics.spacing-small + 2 * root.popup-inset;
+
+    forward-focus: field;
+    focus-on-click: false; focus-on-tab-navigation: false;
+    accessible-role:spinbox;
+    accessible-label:root.accessible-name;
+    accessible-value:root.value;
+    accessible-value-minimum:root.result.accessible-minimum;
+    accessible-value-maximum:root.result.accessible-maximum;
+    accessible-value-step:root.result.accessible-step;
+    accessible-enabled:root.enabled && root.active;
+    accessible-action-increment => { if (root.up-enabled) { root.step(true,false); } }
+    accessible-action-decrement => { if (root.down-enabled) { root.step(false,false); } }
+    accessible-action-set-value(value) => { if (root.enabled && root.active) { root.value = value;root.sync(NumberBoxAction.refresh); } }
+    min-width: root.inline ? FluentMetrics.number-min-width : field.min-width;
+    min-height: layout.min-height; preferred-height: layout.preferred-height;
+    vertical-stretch: 0;
+    public function select-all() { field.select-all(); }
+    public function dismiss-popup() { popup.dismiss(); }
+    public function commit() { root.sync(NumberBoxAction.commit); }
+    public function restore() { root.sync(NumberBoxAction.restore); }
+    public function step(up: bool, large: bool) {
+        root.sync(up ? (large ? NumberBoxAction.page-increase : NumberBoxAction.increase)
+            : (large ? NumberBoxAction.page-decrease : NumberBoxAction.decrease));
+        let end = NumberBoxLogic.byte-length(root.text);
+        field.set-selection-offsets(end, end);
+    }
+    function sync(action: NumberBoxAction) {
+        if (!root.logic-ready) { return; }
+        let old = root.last-value;
+        let result = NumberBoxLogic.evaluate({value:root.value, text:root.text, minimum:root.minimum, maximum:root.maximum,
+            external-value:root.value != root.last-value, small-change:root.small-change, large-change:root.large-change, validation-disabled:root.validation-mode == NumberBoxValidationMode.disabled,
+            wrap:root.wrap, accepts-expression:root.accepts-expression, decimal-separator:root.decimal-separator, minimum-fraction-digits:root.minimum-fraction-digits}, action);
+        root.result = result;
+        if (result.error != "") { return; }
+        root.last-value = result.value; root.last-text = result.text;
+        root.last-minimum = result.minimum; root.last-maximum = result.maximum;
+        root.value = result.value; root.text = result.text;
+        root.minimum = result.minimum; root.maximum = result.maximum;
+        if (!NumberBoxLogic.equal(old, result.value)) { root.value-changed(old, result.value); }
+    }
+    changed logic-ready => { if (root.logic-ready) { root.sync(NumberBoxAction.refresh); } }
+    changed value => { if (root.value != root.last-value) { root.sync(NumberBoxAction.refresh); } }
+    changed text => { if (root.text != root.last-text) { root.sync(NumberBoxAction.commit); } }
+    changed minimum => { if (root.minimum != root.last-minimum) { root.sync(NumberBoxAction.minimum-changed); } }
+    changed maximum => { if (root.maximum != root.last-maximum) { root.sync(NumberBoxAction.maximum-changed); } }
+    changed small-change => { root.sync(NumberBoxAction.settings-changed); }
+    changed large-change => { root.sync(NumberBoxAction.settings-changed); }
+    changed wrap => { root.sync(NumberBoxAction.settings-changed); }
+    changed validation-mode => { root.sync(NumberBoxAction.settings-changed); }
+    changed decimal-separator => { root.sync(NumberBoxAction.refresh); }
+    changed minimum-fraction-digits => { root.sync(NumberBoxAction.refresh); }
+    changed editor-focused => {
+        if (root.editor-focused) {
+            field.select-all();
+
+            if (root.compact && root.active && root.enabled && !root.open) { popup.show(); field.focus(); }
+        } else if (!root.open) { root.commit(); }
+    }
+    changed spin-button-placement => {
+        popup.dismiss();
+        if (root.compact && root.editor-focused && root.active && root.enabled) { popup.show(); field.focus(); }
+    }
+    changed active => { if (!root.active) { root.dismiss-popup(); } }
+    changed enabled => { if (!root.enabled) { root.dismiss-popup(); } }
+    function handle-key-down(event: KeyEvent) -> EventResult {
+        if (!root.enabled || !root.active || !root.editor-focused) { return reject; }
+        if (event.text == Key.UpArrow || event.text == Key.DownArrow || event.text == Key.PageUp || event.text == Key.PageDown) {
+            root.step(event.text == Key.UpArrow || event.text == Key.PageUp, event.text == Key.PageUp || event.text == Key.PageDown);
+            return accept;
+        }
+        if (event.text == Key.Tab || event.text == Key.Backtab) { root.commit(); popup.dismiss(); return reject; }
+        if (event.text == Key.Return || event.text == Key.Escape) { return accept; }
+        return reject;
+    }
+    function handle-key-up(event: KeyEvent) -> EventResult {
+        if (!root.enabled || !root.active || !root.editor-focused) { return reject; }
+        if (event.text == Key.Return) { root.commit(); return accept; }
+        if (event.text == Key.Escape) { root.restore(); return accept; }
+        return reject;
+    }
+
+    capture-key-pressed(event) => { return root.handle-key-down(event); }
+    capture-key-released(event) => { return root.handle-key-up(event); }
+
+    layout := VerticalLayout {
+        width: 100%; height: 100%; spacing: FluentMetrics.spacing-medium;
+        if root.header != "" : FluentText { text:root.header; color:root.enabled ? FluentTheme.text-primary : FluentTheme.text-disabled; wrap:word-wrap; accessible-role:none; }
+        Rectangle {
+            min-height: field.min-height; preferred-height:self.min-height; vertical-stretch:0;
+            field := TextBox {
+                accessible-role: none;
+                x:0px; y:0px; width:100%; height:100%;
+                enabled:root.enabled && root.active;
+                placeholder-text:root.placeholder-text; accessible-name:root.accessible-name;
+                clear-button-width: max(FluentMetrics.number-clear-width, self.height);
+                clear-button-offset:root.spin-column;
+                trailing-inset:FluentMetrics.text-box-padding-right + FluentMetrics.control-stroke + root.spin-column;
+                minimum-target:root.inline && root.minimum-target > 0px ? root.minimum-target + 2 * FluentMetrics.spacing-small : root.minimum-target;
+                edited(value) => { root.last-text = value; }
+                scrolled(event) => {
+                    if (root.editor-focused && event.delta-y != 0px) { root.step(event.delta-y > 0px, false); return accept; }
+                    return reject;
+                }
+            }
+            inline-up := NumberSpinButton {
+                visible:root.inline; enabled:root.up-enabled; active:root.active && root.inline; up:true;
+                x: parent.width - root.spin-column;
+                y:FluentMetrics.spacing-small; width:root.inline-button-width; height:max(0px,parent.height - 2 * self.y);
+                clicked => { field.focus(); root.step(true,false); }
+            }
+            inline-down := NumberSpinButton {
+                visible:root.inline; enabled:root.down-enabled; active:root.active && root.inline;
+                x: parent.width - self.width - FluentMetrics.spacing-small;
+                y:FluentMetrics.spacing-small; width:root.inline-button-width; height:max(0px,parent.height - 2 * self.y);
+                clicked => { field.focus(); root.step(false,false); }
+            }
+            if root.compact : FluentIcon {
+                x:parent.width - FluentMetrics.number-compact-indicator-width;
+                y:(parent.height - self.height)/2;
+                width:FluentMetrics.small-chevron-size; height:self.width;
+                viewbox-width:12; viewbox-height:12;
+                commands:"M 3 4 L 6 1 L 9 4 M 3 8 L 6 11 L 9 8";
+                stroke:FluentTheme.text-secondary;
+            }
+        }
+        if root.description != "" : FluentText { text:root.description; color:FluentTheme.text-secondary; wrap:word-wrap; }
+    }
+    popup := OverlayHost {
+        area:root.viewport; active:root.enabled && root.active && root.compact;
+        use-positioned-panel:true;
+        positioned-panel:{
+            x:clamp(root.input-bounds.x + root.input-bounds.width + FluentMetrics.number-popup-offset-x,
+                root.viewport.x,max(root.viewport.x,root.viewport.x + root.viewport.width - root.popup-width)),
+            y:clamp(root.input-bounds.y + FluentMetrics.number-popup-offset-y,
+                root.viewport.y,max(root.viewport.y,root.viewport.y + root.viewport.height - root.popup-height)),
+            width:min(root.popup-width,root.viewport.width),height:min(root.popup-height,root.viewport.height),
+        };
+        focus-scope-on-open:false; dismiss-on-escape:false;
+        acrylic:true;
+        outside-pressed => { root.commit(); popup.dismiss(); field.clear-input-focus(); }
+        FocusScope {
+          width:root.popup-width; height:root.popup-height;
+          focus-on-click:false;focus-on-tab-navigation:false;
+          capture-key-pressed(event) => { return root.handle-key-down(event); }
+          capture-key-released(event) => { return root.handle-key-up(event); }
+          VerticalLayout {
+            width:100%; height:100%;
+            padding:root.popup-inset; spacing:FluentMetrics.spacing-small;
+            NumberSpinButton {
+                up:true; popup:true; enabled:root.up-enabled; active:root.open;
+                min-height:root.popup-button-size; preferred-height:self.min-height;
+                clicked => { root.step(true,false); }
+            }
+            NumberSpinButton {
+                popup:true; enabled:root.down-enabled; active:root.open;
+                min-height:root.popup-button-size; preferred-height:self.min-height;
+                clicked => { root.step(false,false); }
+            }
+          }
+        }
+    }
+}

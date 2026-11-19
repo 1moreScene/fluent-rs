@@ -1,0 +1,122 @@
+import { AutoSuggestBox, AutoSuggestionTextChangeReason } from "../../../ui/auto-suggest-box.slint";
+import { Button } from "../../../ui/button.slint";
+import { ItemData } from "../../../ui/item-presenter.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+export struct SuggestProbe {
+    input: OverlayArea, popup: OverlayArea, open: bool, focused: bool,
+    selected: int, clear: Point, query: Point,
+}
+
+export component AutoSuggestBoxPage inherits FluentScrollView {
+    in property <bool> active;
+    in property <OverlayArea> viewport;
+    in property <length> target-size;
+    in-out property <[ItemData]> items;
+    in-out property <string> text <=> search.text;
+    in-out property <bool> input-enabled: true;
+    in-out property <bool> query-icon: true;
+    in-out property <bool> update-text: true;
+    out property <AutoSuggestionTextChangeReason> reason;
+    out property <int> changes;
+    out property <int> choices;
+    out property <int> submissions;
+    out property <string> submitted-text;
+    out property <int> submitted-index: -1;
+    out property <bool> following-focused: following.has-focus;
+    callback filter(string) -> [ItemData];
+    out property <SuggestProbe> probe: {
+        input: search.input-bounds, popup: search.popup-bounds,
+        open: search.is-suggestion-list-open, focused: search.editor-focused,
+        selected: search.highlighted-index,
+        clear: { x: search.input-bounds.x + search.width - FluentMetrics.suggest-right-margin
+            - max(root.target-size, FluentMetrics.suggest-action-width) / 2
+            - (root.query-icon ? max(root.target-size, FluentMetrics.suggest-action-width) + FluentMetrics.suggest-query-gap : 0px),
+            y: search.input-bounds.y + search.input-bounds.height / 2 },
+        query: { x: search.input-bounds.x + search.width - FluentMetrics.suggest-right-margin
+            - max(root.target-size, FluentMetrics.suggest-action-width) / 2,
+            y: search.input-bounds.y + search.input-bounds.height / 2 },
+    };
+    public function show-suggestions() { search.show-suggestions(); }
+    public function dismiss-suggestions() { search.dismiss-suggestions(); }
+    public function select-input() { search.focus(); search.select-all(); }
+
+    content-height: max(self.height, examples.preferred-height);
+    examples := VerticalLayout {
+        x: 0px;
+        y: 0px;
+        width: root.content-width;
+        height: self.preferred-height;
+        padding: FluentMetrics.focus-outset;
+        spacing: FluentMetrics.spacing-large;
+
+        search := AutoSuggestBox {
+            header: "Find a control";
+            placeholder-text: "Type a control name";
+            enabled: root.input-enabled;
+            active: root.active;
+            viewport: root.viewport;
+            items: root.items;
+            minimum-target: root.target-size;
+            query-icon: root.query-icon;
+            update-text-on-select: root.update-text;
+            text-changed(value, reason) => {
+                root.reason = reason;
+                root.changes += 1;
+                if (reason == AutoSuggestionTextChangeReason.user-input) { root.items = root.filter(value); }
+            }
+            suggestion-chosen(index) => { root.choices += 1; }
+            query-submitted(value, index) => {
+                root.submitted-text = value;
+                root.submitted-index = index;
+                root.submissions += 1;
+            }
+        }
+        following := Button {
+            text: "Search again";
+            minimum-target: root.target-size;
+            clicked => { search.focus(); search.select-all(); }
+        }
+        FluentText {
+            text: root.text != "" && root.items.length == 0 ? "No results found" : "";
+            visible: self.text != "";
+            color: FluentTheme.text-secondary;
+        }
+        FluentText {
+            text: root.submissions > 0 ? "Query submitted: " + root.submitted-text : "";
+            visible: self.text != "";
+            wrap: word-wrap;
+        }
+        FlexboxLayout {
+            spacing: FluentMetrics.spacing-medium;
+            alignment: start;
+            Button {
+                text: root.input-enabled ? "Disable input" : "Enable input";
+                minimum-target: root.target-size;
+                clicked => { root.input-enabled = !root.input-enabled; }
+            }
+            Button {
+                text: root.query-icon ? "Hide search icon" : "Show search icon";
+                minimum-target: root.target-size;
+                clicked => { root.query-icon = !root.query-icon; }
+            }
+            Button {
+                text: root.update-text ? "Keep typed text on selection" : "Fill text from selection";
+                minimum-target: root.target-size;
+                clicked => { root.update-text = !root.update-text; }
+            }
+        }
+        AutoSuggestBox {
+            header: "Disabled";
+            text: "Disabled example";
+            enabled: false;
+            active: root.active;
+            query-icon: true;
+            viewport: root.viewport;
+            minimum-target: root.target-size;
+        }
+    }
+}

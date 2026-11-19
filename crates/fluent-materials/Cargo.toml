@@ -1,0 +1,10 @@
+[package]
+name = "fluent-materials"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+slint.workspace = true
+skia-safe = { version = "=0.157.0", default-features = false }

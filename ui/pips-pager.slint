@@ -1,0 +1,284 @@
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { FluentFocus, FluentPointerArea, FluentPressable } from "interaction.slint";
+import { OverlayArea, OverlayPlacement } from "overlay-placement.slint";
+import { FluentFocusRing } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+import { Tooltip } from "tooltip.slint";
+
+export enum PipsPagerButtonVisibility { collapsed, visible, visible-on-pointer-over }
+
+component PagerNavigationButton inherits FluentPressable {
+    in property <string> label;
+    in property <angle> rotation;
+    out property <OverlayArea> bounds: {
+        x: self.absolute-position.x, y: self.absolute-position.y, width: self.width, height: self.height,
+    };
+
+    focus-on-press: true;
+    focus-on-tab-navigation: root.enabled;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if (root.enabled) { root.activated(); } }
+
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
+        border-radius: FluentMetrics.control-radius;
+        border-width: FluentTheme.high-contrast && (root.pressed || root.hovered) ? FluentMetrics.control-stroke : 0px;
+        border-color: FluentTheme.contrast-highlight;
+        background: FluentTheme.high-contrast ? FluentTheme.contrast-button-face : transparent;
+    }
+    FluentSystemIcon {
+        width: FluentMetrics.pip-chevron-size * (root.pressed ? 0.875 : 1);
+        height: self.width;
+        source: @image-url("icons/fluent/chevron-down-12-regular.svg");
+        transform-rotation: root.rotation;
+        foreground: FluentTheme.high-contrast
+            ? (!root.enabled ? FluentTheme.contrast-disabled
+                : root.hovered || root.pressed ? FluentTheme.contrast-highlight : FluentTheme.contrast-button-text)
+            : !root.enabled ? FluentTheme.control-strong-fill-disabled
+            : root.hovered || root.pressed ? FluentTheme.text-secondary : FluentTheme.control-strong-fill;
+    }
+    if root.focus-visible : FluentFocusRing {
+        y: FluentMetrics.focus-outset;
+        width: parent.width;
+        height: max(0px, parent.height - 2 * self.y);
+        horizontal-outset: 0px;
+    }
+}
+
+component PagerPip inherits FluentPressable {
+    in property <bool> selected;
+    in property <bool> keyboard-focused;
+    in property <int> page-index;
+    in property <string> label;
+
+    property <bool> highlighted: root.enabled && (root.selected || root.hovered || root.pressed);
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+    accessible-role: list-item;
+    accessible-label: root.label;
+    accessible-item-index: root.page-index;
+    accessible-item-selected: root.selected;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if (root.enabled) { root.activated(); } }
+
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
+        border-radius: FluentMetrics.control-radius;
+        background: !FluentTheme.high-contrast ? transparent
+            : root.highlighted ? FluentTheme.contrast-highlight : FluentTheme.contrast-button-face;
+    }
+    Rectangle {
+        width: !root.pressed && (root.selected || root.hovered) ? FluentMetrics.pip-large-size : FluentMetrics.pip-size;
+        height: self.width;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: self.width / 2;
+        background: FluentTheme.high-contrast ? (!root.enabled ? FluentTheme.contrast-disabled
+            : root.highlighted ? FluentTheme.contrast-highlight-text : FluentTheme.contrast-button-text)
+            : !root.enabled ? FluentTheme.control-strong-fill-disabled
+            : root.hovered || root.pressed ? FluentTheme.text-secondary : FluentTheme.control-strong-fill;
+    }
+    if root.keyboard-focused : FluentFocusRing {
+        y: FluentMetrics.focus-outset;
+        width: parent.width;
+        height: max(0px, parent.height - 2 * self.y);
+        horizontal-outset: 0px;
+    }
+}
+
+export component PipsPager inherits Rectangle {
+    in property <int> number-of-pages: -1;
+    in-out property <int> page-index;
+    in property <int> max-visible-pips: 5;
+    in property <Orientation> orientation: Orientation.horizontal;
+    in property <PipsPagerButtonVisibility> previous-button-visibility;
+    in property <PipsPagerButtonVisibility> next-button-visibility;
+    in property <bool> wrap-pages;
+    in property <bool> enabled: true;
+    in property <bool> active: true;
+    in property <length> minimum-target;
+    in property <string> label: "Pages";
+    in property <string> previous-label: @tr("Previous page");
+    in property <string> next-label: @tr("Next page");
+    in property <OverlayArea> viewport;
+
+    out property <int> selected-index: root.last-page < 0 ? -1 : clamp(root.page-index, 0, root.last-page);
+    out property <int> focused-index: rail.has-focus ? root.focused-page : -1;
+    out property <int> visible-count: min(root.requested-count,
+        floor(max(0px, root.axis-length - root.leading - root.trailing) / root.pip-length));
+    out property <int> first-visible-index: root.visible-count <= 0 ? -1
+        : clamp(root.rail-anchor - floor(root.visible-count / 2), 0, root.last-page - root.visible-count + 1);
+    out property <bool> previous-shown: previous.visible;
+    out property <bool> next-shown: next.visible;
+    out property <OverlayArea> previous-bounds: previous.bounds;
+    out property <OverlayArea> next-bounds: next.bounds;
+    callback selection-changed(int);
+
+    property <bool> vertical: root.orientation == Orientation.vertical;
+    // Keep page-number labels representable as one-based signed integers.
+    property <int> last-page: root.number-of-pages < 0 ? 2147483646 : root.number-of-pages - 1;
+    property <int> requested-count: max(0, min(root.max-visible-pips, root.last-page + 1));
+    property <int> focused-page;
+    property <int> rail-anchor: rail.has-focus ? clamp(root.focused-page, 0, root.last-page) : root.selected-index;
+    property <length> pip-length: max(root.minimum-target, FluentMetrics.pip-step);
+    property <length> cross-length: max(root.minimum-target, FluentMetrics.pip-navigation-size);
+    property <length> leading: root.previous-button-visibility == PipsPagerButtonVisibility.collapsed ? 0px : root.cross-length;
+    property <length> trailing: root.next-button-visibility == PipsPagerButtonVisibility.collapsed ? 0px : root.cross-length;
+    property <length> axis-length: root.vertical ? root.height : root.width;
+    property <length> ideal-length: root.leading + root.trailing + root.requested-count * root.pip-length;
+    property <length> rail-length: root.visible-count * root.pip-length;
+    property <length> used-length: root.leading + root.rail-length + root.trailing;
+    property <length> axis-start: max(0px, (root.axis-length - root.used-length) / 2);
+    property <bool> cyclic: root.number-of-pages > 1 && root.wrap-pages;
+    property <bool> operable: root.active && root.enabled;
+    property <bool> can-go-previous: root.visible-count > 0 && (root.selected-index > 0 || root.cyclic);
+    property <bool> can-go-next: root.visible-count > 0 && (root.selected-index < root.last-page || root.cyclic);
+    property <bool> show-on-hover: zone.pointer-inside
+        || (FluentFocus.keyboard-input && (previous.has-focus || next.has-focus || rail.has-focus));
+
+    min-width: root.vertical ? root.cross-length : 0px;
+    min-height: root.vertical ? 0px : root.cross-length;
+    preferred-width: root.vertical ? root.cross-length : root.ideal-length;
+    preferred-height: root.vertical ? root.ideal-length : root.cross-length;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+
+    public function set-selected-index(index: int) {
+        if (root.last-page >= 0) { root.page-index = clamp(index, 0, root.last-page); }
+    }
+
+    public pure function pip-center(index: int) -> Point {
+        let along = root.axis-start + root.leading + (index - root.first-visible-index + 0.5) * root.pip-length;
+        return {
+            x: root.absolute-position.x + (root.vertical ? root.width / 2 : along),
+            y: root.absolute-position.y + (root.vertical ? along : root.height / 2),
+        };
+    }
+
+    function normalize-page-index() {
+        if (root.last-page >= 0 && root.page-index != root.selected-index) { root.page-index = root.selected-index; }
+    }
+
+    changed page-index => { root.normalize-page-index(); }
+    changed number-of-pages => { root.normalize-page-index(); }
+    changed selected-index => {
+        root.focused-page = max(0, root.selected-index);
+        root.selection-changed(root.selected-index);
+    }
+
+    pure function arrow-shown(visibility: PipsPagerButtonVisibility, available: bool) -> bool {
+        return available && visibility != PipsPagerButtonVisibility.collapsed
+            && (visibility == PipsPagerButtonVisibility.visible || root.show-on-hover);
+    }
+
+    function navigate(step: int) {
+        if (!root.operable) { return; }
+        let index = root.selected-index;
+        let target = root.cyclic && step < 0 && index == 0 ? root.last-page
+            : root.cyclic && step > 0 && index == root.last-page ? 0 : index + step;
+        root.set-selected-index(target);
+        if ((step < 0 && !root.can-go-previous) || (step > 0 && !root.can-go-next)) { rail.focus(); }
+    }
+
+    zone := FluentPointerArea {
+        width: 100%;
+        height: 100%;
+
+        previous := PagerNavigationButton {
+            x: root.vertical ? (root.width - self.width) / 2 : root.axis-start;
+            y: root.vertical ? root.axis-start : (root.height - self.height) / 2;
+            width: root.cross-length;
+            height: self.width;
+            visible: root.arrow-shown(root.previous-button-visibility, root.can-go-previous);
+            enabled: root.operable && self.visible;
+            label: root.previous-label;
+            rotation: root.vertical ? 180deg : 90deg;
+            activated => { root.navigate(-1); }
+        }
+
+        rail := FluentPressable {
+            x: root.vertical ? (root.width - self.width) / 2 : root.axis-start + root.leading;
+            y: root.vertical ? root.axis-start + root.leading : (root.height - self.height) / 2;
+            width: root.vertical ? root.cross-length : root.rail-length;
+            height: root.vertical ? root.rail-length : root.cross-length;
+            accepts-pointer: false;
+            focus-on-click: false;
+            enabled: root.operable && root.visible-count > 0;
+            focus-on-tab-navigation: self.enabled;
+            accessible-role: list;
+            accessible-label: root.label;
+            accessible-orientation: root.orientation;
+            accessible-enabled: self.enabled;
+            accessible-item-count: max(0, root.number-of-pages);
+            accessible-delegate-focus: root.focused-index;
+            focus-changed-event => {
+                if (self.has-focus) { root.focused-page = max(0, root.selected-index); }
+            }
+            activated => { root.set-selected-index(root.focused-page); }
+
+            capture-key-pressed(event) => {
+                if (!self.enabled || event.modifiers.alt) { return reject; }
+                let previous = event.text == Key.LeftArrow || event.text == Key.UpArrow;
+                let next = event.text == Key.RightArrow || event.text == Key.DownArrow;
+                if (!previous && !next) { return reject; }
+                self.use-keyboard-focus();
+                root.focused-page = clamp(root.focused-page + (previous ? -1 : 1), 0, root.last-page);
+                return accept;
+            }
+
+            for slot in root.visible-count : PagerPip {
+                page-index: root.first-visible-index + slot;
+                x: root.vertical ? 0px : slot * root.pip-length;
+                y: root.vertical ? slot * root.pip-length : 0px;
+                width: root.vertical ? root.cross-length : root.pip-length;
+                height: root.vertical ? root.pip-length : root.cross-length;
+                enabled: root.operable;
+                selected: self.page-index == root.selected-index;
+                keyboard-focused: rail.focus-visible && self.page-index == root.focused-index;
+                label: @tr("Page {}", self.page-index + 1);
+                activated => {
+                    root.set-selected-index(self.page-index);
+                    rail.use-pointer-focus();
+                    rail.focus();
+                }
+            }
+        }
+
+        next := PagerNavigationButton {
+            x: root.vertical ? (root.width - self.width) / 2 : root.axis-start + root.leading + root.rail-length;
+            y: root.vertical ? root.axis-start + root.leading + root.rail-length : (root.height - self.height) / 2;
+            width: root.cross-length;
+            height: self.width;
+            visible: root.arrow-shown(root.next-button-visibility, root.can-go-next);
+            enabled: root.operable && self.visible;
+            label: root.next-label;
+            rotation: root.vertical ? 0deg : -90deg;
+            activated => { root.navigate(1); }
+        }
+    }
+
+    Tooltip {
+        viewport: root.viewport;
+        anchor: previous.bounds;
+        placement: root.vertical ? OverlayPlacement.top : OverlayPlacement.left;
+        text: root.previous-label;
+        active: previous.enabled;
+        hovered: previous.hovered;
+        keyboard-focused: previous.focus-visible;
+        pressed: previous.pressed;
+    }
+    Tooltip {
+        viewport: root.viewport;
+        anchor: next.bounds;
+        placement: root.vertical ? OverlayPlacement.bottom : OverlayPlacement.right;
+        text: root.next-label;
+        active: next.enabled;
+        hovered: next.hovered;
+        keyboard-focused: next.focus-visible;
+        pressed: next.pressed;
+    }
+}

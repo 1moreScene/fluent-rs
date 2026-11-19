@@ -1,3 +1,4 @@
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
 import { Button, ButtonState } from "../../../ui/button.slint";
 import { CheckBox, CheckBoxSurface } from "../../../ui/check-box.slint";
 import { FluentText } from "../../../ui/primitives.slint";
@@ -55,7 +56,7 @@ component ToggleStateSamples inherits VerticalLayout {
     }
 }
 
-export component TogglesPage inherits Flickable {
+export component TogglesPage inherits FluentScrollView {
     in property <length> target-size;
     in property <string> check-label: "CheckBox";
     in-out property <bool> three-state: true;
@@ -84,12 +85,13 @@ export component TogglesPage inherits Flickable {
             : value == ToggleValue.indeterminate ? "Indeterminate" : "Unchecked";
     }
 
-    content-width: self.width;
     content-height: max(self.height, page.preferred-height);
     mouse-drag-pan-enabled: false;
 
     page := VerticalLayout {
-        width: parent.width;
+        x: 0px;
+        y: 0px;
+        width: root.content-width;
         height: self.preferred-height;
         padding: FluentMetrics.spacing-medium;
         spacing: FluentMetrics.spacing-large;

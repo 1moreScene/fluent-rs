@@ -1,12 +1,19 @@
 import { ButtonSurface, ButtonState, ButtonVariant } from "button-surface.slint";
 import { FluentPressable } from "interaction.slint";
+import { FluentMetrics } from "tokens.slint";
 export { ButtonState, ButtonVariant }
 
 export component Button inherits FluentPressable {
+    slot content;
     in property <string> text;
     in property <ButtonVariant> variant;
     in property <bool> wrap-text;
     in property <length> minimum-target;
+    in property <length> horizontal-padding: FluentMetrics.button-padding-horizontal;
+    in property <length> top-padding: FluentMetrics.button-padding-top;
+    in property <length> bottom-padding: FluentMetrics.button-padding-bottom;
+
+    out property <color> content-foreground: surface.content-foreground;
 
     callback clicked;
 
@@ -32,5 +39,9 @@ export component Button inherits FluentPressable {
         focus-visible: root.focus-visible;
         wrap-text: root.wrap-text;
         minimum-target: root.minimum-target;
+        horizontal-padding: root.horizontal-padding;
+        top-padding: root.top-padding;
+        bottom-padding: root.bottom-padding;
+        content << content;
     }
 }

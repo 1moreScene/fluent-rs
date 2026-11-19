@@ -1,0 +1,243 @@
+import { ItemAppearance, ItemData, ItemDecoration, ItemPresenter } from "item-presenter.slint";
+import { FluentFocusScope } from "interaction.slint";
+import { FluentSurface, FluentText } from "primitives.slint";
+import { FluentScrollBar } from "scroll-bar.slint";
+import { ListDirection, SelectionLogic } from "selection-model.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+// Keep the name and visible geometry contract used by Slint 1.19's virtual repeater.
+component ListView inherits Flickable {
+    out property <length> visible-width: self.width;
+    out property <length> visible-height: self.height;
+    public function ensure-row-visible(row: int, behavior: ScrollBehavior) {}
+    @children
+}
+
+export component SelectableList inherits FluentFocusScope {
+    in property <[ItemData]> items;
+    in property <[ItemDecoration]> decorations;
+    in property <[int]> mixed-rows;
+    in property <bool> show-checks;
+    in property <bool> preserve-position;
+    // SelectionModel supplies sorted indices for the visible rows' lookup.
+    in property <[int]> selected;
+    in property <string> label;
+    in property <string> empty-text: "No items";
+    in property <length> minimum-target;
+    in property <bool> allow-select-all;
+    in property <bool> wrap-navigation;
+    in property <bool> framed: true;
+    in property <ItemAppearance> item-appearance;
+    in property <bool> focus-on-init;
+    in property <int> initial-focus-index: -1;
+    in property <int> initial-last-visible-row: -1;
+    in property <int> preview-index: -1;
+    in property <length> scroll-bar-outset;
+    in property <length> content-margin-y;
+    in property <int> separator-before-row: -1;
+    out property <bool> row-focus-visible: root.focus-visible && root.current >= 0;
+    out property <int> focused-row: self.has-focus ? root.current : -1;
+    out property <length> scroll-offset: -list.content-y;
+    in property <length> row-height: FluentMetrics.list-row-height(root.minimum-target);
+    callback row-activated(int, int, bool, bool, bool);
+    callback row-navigated(int, int, bool, bool);
+    callback select-all-requested;
+    callback focus-row-changed(int);
+    callback row-key-action(int, string) -> bool;
+    callback row-disclosure-clicked(int);
+    callback row-check-clicked(int);
+
+    property <int> current: -1;
+    property <int> item-count: root.items.length;
+    property <length> inset: root.framed && FluentTheme.high-contrast ? FluentMetrics.focus-outer-stroke : 0px;
+
+    focus-on-click: false;
+    focus-on-tab-navigation: root.items.length > 0;
+    accessible-role: AccessibleRole.list;
+    accessible-label: root.label;
+    accessible-orientation: vertical;
+    accessible-enabled: root.enabled;
+    accessible-item-count: root.items.length;
+    accessible-delegate-focus: root.focused-row;
+
+    changed items => { if (!root.preserve-position) { root.reset-view(); } }
+    changed item-count => { if (!root.preserve-position) { root.reset-view(); } }
+
+    function reset-view() {
+        root.current = -1;
+        list.content-y = 0px;
+    }
+
+    pure function can-focus(index: int) -> bool {
+        return index >= 0 && index < root.items.length && !root.items[index].disabled;
+    }
+
+    function move-to(index: int) {
+        root.current = index;
+        if (index >= 0) { list.ensure-row-visible(index, ScrollBehavior.instant); }
+    }
+
+    changed preview-index => {
+        if (root.can-focus(root.preview-index)) {
+            list.ensure-row-visible(root.preview-index, ScrollBehavior.instant);
+        }
+    }
+
+    public function focus-row(index: int) {
+        root.move-to(root.can-focus(index) ? index : SelectionLogic.target(root.items, -1, ListDirection.first));
+        self.focus();
+    }
+
+    init => {
+        if (!root.focus-on-init && root.can-focus(root.preview-index)) {
+            list.ensure-row-visible(root.preview-index, ScrollBehavior.instant);
+        }
+        if (root.focus-on-init) {
+            if (root.initial-last-visible-row >= 0) {
+                root.current = root.can-focus(root.initial-focus-index) ? root.initial-focus-index
+                    : SelectionLogic.target(root.items, root.initial-focus-index - 1, ListDirection.next);
+                list.ensure-row-visible(root.initial-last-visible-row, ScrollBehavior.instant);
+                root.focus();
+            } else {
+                root.focus-row(root.initial-focus-index);
+            }
+            root.focus-row-changed(root.focused-row);
+        }
+    }
+    changed focused-row => { root.focus-row-changed(root.focused-row); }
+
+    focus-changed-event => {
+        if (root.has-focus && !root.can-focus(root.current)) {
+            let selected-index = root.selected.length > 0 ? root.selected[0] : -1;
+            root.move-to(root.can-focus(selected-index) ? selected-index
+                : SelectionLogic.target(root.items, -1, ListDirection.first));
+        }
+    }
+
+    key-pressed(event) => {
+        if (!root.enabled || root.items.length == 0 || event.modifiers.alt) { return reject; }
+        if (!event.repeat && root.can-focus(root.current) && root.row-key-action(root.current, event.text)) {
+            root.use-keyboard-focus();
+            return accept;
+        }
+        if (event.text == Key.Space || event.text == Key.Return) {
+            if (!event.repeat && root.can-focus(root.current)) {
+                root.use-keyboard-focus();
+                root.row-activated(root.current, root.current, event.modifiers.control, event.modifiers.shift, true);
+            }
+            return accept;
+        }
+        if (root.allow-select-all && event.modifiers.control && (event.text == "a" || event.text == "A")) {
+            if (!event.repeat) { root.select-all-requested(); }
+            return accept;
+        }
+        let previous = event.text == Key.UpArrow || event.text == Key.PageUp;
+        let next = event.text == Key.DownArrow || event.text == Key.PageDown;
+        if (!previous && !next && event.text != Key.Home && event.text != Key.End) { return reject; }
+        let direction = event.text == Key.Home ? ListDirection.first
+            : event.text == Key.End ? ListDirection.last : previous ? ListDirection.previous : ListDirection.next;
+        let from = root.current;
+        let page = max(1, floor(list.height / root.row-height));
+        let start = event.text == Key.PageUp && from >= 0 ? max(1, from - page + 1)
+            : event.text == Key.PageDown && from >= 0 ? min(root.items.length - 2, from + page - 1) : from;
+        let candidate = SelectionLogic.target(root.items, start, direction);
+        let target = candidate >= 0 ? candidate
+            : event.text == Key.PageUp ? SelectionLogic.target(root.items, -1, ListDirection.first)
+            : event.text == Key.PageDown ? SelectionLogic.target(root.items, -1, ListDirection.last)
+            : root.wrap-navigation && event.text == Key.UpArrow ? SelectionLogic.target(root.items, -1, ListDirection.last)
+            : root.wrap-navigation && event.text == Key.DownArrow ? SelectionLogic.target(root.items, -1, ListDirection.first)
+            : -1;
+        root.use-keyboard-focus();
+        if (target >= 0 && target != from) {
+            root.move-to(target);
+            root.row-navigated(target, from, event.modifiers.control, event.modifiers.shift);
+        }
+        return accept;
+    }
+
+    if root.framed : FluentSurface {
+        width: 100%;
+        height: 100%;
+        background: FluentTheme.list-box-background;
+        border-radius: 0px;
+        border-width: root.inset;
+    }
+
+    list := ListView {
+        x: root.inset;
+        y: root.inset;
+        width: max(0px, parent.width - 2 * root.inset);
+        height: max(0px, parent.height - 2 * root.inset);
+        content-width: self.width;
+        content-height: root.items.length * root.row-height + (root.items.length > 0 ? 2 * root.content-margin-y : 0px)
+            + (root.separator-before-row >= 0 ? FluentMetrics.command-overflow-separator : 0px);
+        mouse-drag-pan-enabled: false;
+
+        for item[index] in root.items : ItemPresenter {
+            property <ItemDecoration> adornment: index < root.decorations.length ? root.decorations[index] : {};
+            width: list.width;
+            content-top: index == 0 ? root.content-margin-y : 0px;
+            content-bottom: index == root.items.length - 1 ? root.content-margin-y : 0px;
+            height: root.row-height + self.content-top + self.content-bottom
+                + (self.adornment.separator-before ? FluentMetrics.command-overflow-separator : 0px);
+            text: item.text;
+            appearance: root.item-appearance;
+            touch-padding: root.minimum-target > 0px;
+            decoration: {
+                icon: self.adornment.icon, icon-space: self.adornment.icon-space, indent: self.adornment.indent,
+                has-children: self.adornment.has-children, expanded: self.adornment.expanded,
+                checkable: root.show-checks || self.adornment.checkable,
+                mixed: root.mixed-rows.length > 0 && SelectionLogic.contains(root.mixed-rows, index),
+                command-check-space: self.adornment.command-check-space, command-toggle: self.adornment.command-toggle, command-checked: self.adornment.command-checked,
+                separator-before: self.adornment.separator-before,
+            };
+            enabled: root.enabled && !item.disabled;
+            selected: self.enabled && SelectionLogic.contains(root.selected, index);
+            keyboard-focused: self.enabled && root.row-focus-visible && root.focused-row == index;
+            accessible-item-index: index;
+            disclosure-clicked => { root.row-disclosure-clicked(index); }
+            check-clicked => { root.row-check-clicked(index); }
+            activated(control, shift) => {
+                let from = root.current;
+                root.current = index;
+                root.focus();
+                root.use-pointer-focus();
+                root.row-activated(index, from, control, shift, false);
+            }
+        }
+    }
+
+    FluentScrollBar {
+        x: max(list.x, list.x + list.width - self.width);
+        y: list.y - root.scroll-bar-outset;
+        height: list.height + 2 * root.scroll-bar-outset;
+        extent: list.content-height;
+        viewport-size: list.height;
+        offset: root.scroll-offset;
+        line-step: root.row-height;
+        enabled: root.enabled;
+        offset-requested(y) => {
+            if (abs(y - root.scroll-offset) > list.height) {
+                // Seek directly when a thumb movement skips an entire viewport.
+                let moving-down = y > root.scroll-offset;
+                let edge = (moving-down ? y + list.height : y) - root.content-margin-y;
+                let gap = root.separator-before-row < 0 ? 0px
+                    : clamp(edge - root.separator-before-row * root.row-height, 0px, FluentMetrics.command-overflow-separator);
+                let edge-row = moving-down ? ceil((edge - gap) / root.row-height) - 1 : floor((edge - gap) / root.row-height);
+                list.ensure-row-visible(clamp(edge-row, 0, root.items.length - 1), ScrollBehavior.instant);
+            } else {
+                list.scroll-to({ x: 0px, y: y }, ScrollBehavior.instant);
+            }
+        }
+    }
+
+    if root.items.length == 0 : FluentText {
+        x: FluentMetrics.spacing-medium;
+        width: max(0px, parent.width - 2 * self.x);
+        height: parent.height;
+        text: root.empty-text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: FluentTheme.text-secondary;
+    }
+}

@@ -1,0 +1,109 @@
+import { ButtonState, FluentPressable } from "interaction.slint";
+import { FluentFocusRing, FluentText } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+import { FluentMotion } from "motion.slint";
+
+export component HyperlinkButtonSurface {
+    in property <string> text;
+    in property <ButtonState> state;
+    in property <bool> focus-visible;
+    in property <bool> wrap-text;
+    in property <length> minimum-target;
+    out property <color> foreground: root.state == ButtonState.disabled
+        ? FluentTheme.high-contrast ? FluentTheme.contrast-disabled : FluentTheme.accent-foreground-disabled
+        : FluentTheme.high-contrast
+        ? root.state == ButtonState.pressed ? FluentTheme.contrast-highlight
+            : root.state == ButtonState.pointer-over ? FluentTheme.contrast-text : FluentTheme.contrast-hotlight
+        : root.state == ButtonState.pressed ? FluentTheme.accent-foreground-pressed
+            : root.state == ButtonState.pointer-over ? FluentTheme.accent-foreground-hover : FluentTheme.accent-foreground;
+    out property <bool> underline: FluentTheme.high-contrast || FluentTheme.hyperlink-underline-visible;
+
+    min-width: max(root.minimum-target, content.min-width);
+    min-height: max(root.minimum-target, content.min-height);
+    preferred-width: max(root.minimum-target, content.preferred-width);
+    preferred-height: max(root.minimum-target, content.preferred-height);
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: FluentMetrics.control-radius;
+        background: FluentTheme.high-contrast ? FluentTheme.contrast-surface
+            : root.state == ButtonState.disabled ? transparent
+            : root.state == ButtonState.pressed ? FluentTheme.subtle-fill-pressed
+            : root.state == ButtonState.pointer-over ? FluentTheme.subtle-fill-hover : transparent;
+        animate background {
+            enabled: FluentMotion.enabled;
+            duration: FluentMotion.control-fill-duration;
+            easing: FluentMotion.control-fill-easing;
+        }
+    }
+    content := VerticalLayout {
+        padding-left: FluentMetrics.button-padding-horizontal + FluentMetrics.control-stroke;
+        padding-right: self.padding-left;
+        padding-top: FluentMetrics.button-padding-top + FluentMetrics.control-stroke;
+        padding-bottom: FluentMetrics.button-padding-bottom + FluentMetrics.control-stroke;
+        alignment: center;
+        if !root.underline : FluentText {
+            text: root.text;
+            color: root.foreground;
+            wrap: root.wrap-text ? word-wrap : no-wrap;
+            overflow: elide;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        if root.underline : StyledText {
+            text: @markdown("<u>\{root.text}</u>");
+            default-color: root.foreground;
+            default-font-size: FluentMetrics.body-size;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            max-lines: root.wrap-text ? 0 : 1;
+            accessible-role: none;
+        }
+    }
+    if root.focus-visible && root.state != ButtonState.disabled : FluentFocusRing {
+        width: 100%;
+        height: 100%;
+    }
+}
+
+// The host owns URI launching; Click runs first and can update/clear NavigateUri.
+export component HyperlinkButton inherits FluentPressable {
+    in property <string> text;
+    in-out property <string> navigate-uri;
+    in property <bool> wrap-text;
+    in property <length> minimum-target;
+    out property <color> foreground: surface.foreground;
+    out property <bool> underline: surface.underline;
+    callback clicked;
+    callback navigate-requested(string);
+    pointer-cursor: root.enabled ? MouseCursor.pointer : MouseCursor.default;
+    focus-on-press: true;
+    min-width: surface.min-width;
+    min-height: surface.min-height;
+    preferred-width: surface.preferred-width;
+    preferred-height: surface.preferred-height;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if (root.enabled) { root.activated(); } }
+    activated => {
+        if (root.enabled) {
+            root.clicked();
+            if (root.navigate-uri != "") { root.navigate-requested(root.navigate-uri); }
+        }
+    }
+    surface := HyperlinkButtonSurface {
+        width: 100%;
+        height: 100%;
+        text: root.text;
+        state: root.state;
+        focus-visible: root.focus-visible;
+        wrap-text: root.wrap-text;
+        minimum-target: root.minimum-target;
+    }
+}

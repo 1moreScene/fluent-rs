@@ -1218,13 +1218,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
 
 [[package]]
+name = "fluent-core"
+version = "0.1.0"
+
+[[package]]
 name = "fluent-gallery"
 version = "0.1.0"
 dependencies = [
+ "fluent-core",
+ "fluent-materials",
+ "i-slint-renderer-skia",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
  "raw-window-handle",
  "slint",
  "slint-build",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "fluent-materials"
+version = "0.1.0"
+dependencies = [
+ "skia-safe",
+ "slint",
 ]
 
 [[package]]

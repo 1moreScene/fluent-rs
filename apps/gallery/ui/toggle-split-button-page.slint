@@ -1,0 +1,186 @@
+import { Button } from "../../../ui/button.slint";
+import { FluentSystemIcon } from "../../../ui/fluent-system-icon.slint";
+import { ButtonState } from "../../../ui/interaction.slint";
+import { OverlayArea } from "../../../ui/overlay-host.slint";
+import { PageHost } from "../../../ui/page-host.slint";
+import { FluentIcon, FluentSurface, FluentText } from "../../../ui/primitives.slint";
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { ToggleSplitButton } from "../../../ui/toggle-split-button.slint";
+import { FluentMetrics, FluentTheme } from "../../../ui/tokens.slint";
+
+component ListStyleIcon inherits Rectangle {
+    in property <bool> roman;
+    in property <color> foreground;
+    width: FluentMetrics.flyout-option-icon-size;
+    height: self.width;
+
+    if !root.roman : FluentSystemIcon {
+        width: parent.width;
+        height: parent.height;
+        source: @image-url("../../../ui/icons/fluent/text-bullet-list-20-regular.svg");
+        foreground: root.foreground;
+    }
+    if root.roman : FluentIcon {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 20;
+        viewbox-height: 20;
+        stroke: root.foreground;
+        commands: "M 5 3 V 7 M 4 8 V 12 M 6 8 V 12 M 3 13 V 17 M 5 13 V 17 M 7 13 V 17 M 10 5 H 17 M 10 10 H 17 M 10 15 H 17";
+    }
+}
+
+component ListStyleChoice inherits Button {
+    in property <bool> roman;
+    in property <bool> initial-focus;
+    horizontal-padding: FluentMetrics.flyout-option-padding;
+    top-padding: FluentMetrics.flyout-option-padding;
+    bottom-padding: FluentMetrics.flyout-option-padding;
+    accessible-label: root.roman ? "Roman numerals list" : "Bulleted list";
+
+    init => { if (root.initial-focus) { root.focus(); } }
+    content << ListStyleIcon {
+        roman: root.roman;
+        foreground: root.content-foreground;
+    }
+}
+
+export struct ToggleSplitProbe {
+    bounds: OverlayArea,
+    panel: OverlayArea,
+    primary: Point,
+    secondary: Point,
+    disabled-primary: Point,
+    disabled-secondary: Point,
+    disabled-open: bool,
+    disabled-checked: bool,
+    disabled-state: ButtonState,
+    primary-state: ButtonState,
+    secondary-state: ButtonState,
+    open: bool,
+    focused: bool,
+    roman: bool,
+    activations: int,
+    observed-checked: bool,
+}
+
+export component ToggleSplitButtonPage inherits PageHost {
+    in property <bool> active;
+    in property <length> target-size;
+    in property <OverlayArea> viewport;
+    in-out property <bool> checked <=> list-style.checked;
+    property <bool> use-roman;
+    property <int> action-count;
+    property <bool> action-checked;
+    property <length> option-size: max(root.target-size, FluentMetrics.flyout-option-icon-size
+        + 2 * (FluentMetrics.flyout-option-padding + FluentMetrics.control-stroke));
+    property <length> option-margin: FluentMetrics.flyout-option-margin;
+    property <length> panel-stroke: FluentMetrics.flyout-border-width;
+    out property <ToggleSplitProbe> probe: {
+        bounds: list-style.bounds, panel: list-style.panel-bounds,
+        primary: list-style.primary-center, secondary: list-style.secondary-center,
+        disabled-primary: disabled-style.primary-center, disabled-secondary: disabled-style.secondary-center,
+        disabled-open: disabled-style.open, disabled-checked: disabled-style.checked, disabled-state: disabled-style.primary-state,
+        primary-state: list-style.primary-state, secondary-state: list-style.secondary-state,
+        open: list-style.open, focused: list-style.button-focused, roman: root.use-roman,
+        activations: root.action-count, observed-checked: root.action-checked,
+    };
+
+    function choose(roman: bool) {
+        root.use-roman = roman;
+        list-style.checked = true;
+        list-style.dismiss-flyout();
+    }
+
+    FluentScrollView {
+        width: 100%;
+        height: 100%;
+        content-height: max(self.height, examples.preferred-height);
+        mouse-drag-pan-enabled: false;
+
+        examples := VerticalLayout {
+            alignment: start;
+            padding: FluentMetrics.focus-outset;
+            spacing: FluentMetrics.spacing-large;
+
+            HorizontalLayout {
+                alignment: start;
+                list-style := ToggleSplitButton {
+                    accessible-name: root.use-roman ? "Roman numerals" : "Bullets";
+                    active: root.active;
+                    minimum-target: root.target-size;
+                    viewport: root.viewport;
+                    flyout-width: 2 * (root.option-size + 2 * root.option-margin
+                        + FluentMetrics.flyout-padding-horizontal + root.panel-stroke);
+                    flyout-height: root.option-size + 2 * (root.option-margin + root.panel-stroke)
+                        + FluentMetrics.flyout-padding-top + FluentMetrics.flyout-padding-bottom;
+                    focus-flyout-content: true;
+                    clicked => {
+                        root.action-count += 1;
+                        root.action-checked = self.checked;
+                    }
+
+                    primary-content << ListStyleIcon {
+                        roman: root.use-roman;
+                        foreground: list-style.primary-foreground;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: root.panel-stroke + FluentMetrics.flyout-padding-horizontal + root.option-margin;
+                        padding-right: self.padding-left;
+                        padding-top: root.panel-stroke + FluentMetrics.flyout-padding-top + root.option-margin;
+                        padding-bottom: root.panel-stroke + FluentMetrics.flyout-padding-bottom + root.option-margin;
+                        spacing: 2 * root.option-margin;
+                        alignment: center;
+                        ListStyleChoice {
+                            initial-focus: true;
+                            minimum-target: root.target-size;
+                            clicked => { root.choose(false); }
+                        }
+                        ListStyleChoice {
+                            roman: true;
+                            minimum-target: root.target-size;
+                            clicked => { root.choose(true); }
+                        }
+                    }
+                }
+            }
+
+            FluentSurface {
+                horizontal-stretch: 0;
+                preferred-width: 240px * FluentTheme.ui-scale;
+                min-height: 96px * FluentTheme.ui-scale;
+                background: FluentTheme.card-fill;
+                border-color: FluentTheme.card-stroke;
+                accessible-role: AccessibleRole.groupbox;
+                accessible-label: "List preview";
+
+                VerticalLayout {
+                    padding: FluentMetrics.spacing-large;
+                    spacing: FluentMetrics.spacing-small;
+                    alignment: center;
+                    FluentText {
+                        text: (!root.checked ? "" : root.use-roman ? "Ⅰ.  " : "•  ") + "Plan the work";
+                        wrap: word-wrap;
+                    }
+                    FluentText {
+                        text: (!root.checked ? "" : root.use-roman ? "Ⅱ.  " : "•  ") + "Review the result";
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: start;
+                disabled-style := ToggleSplitButton {
+                    text: "Unavailable";
+                    checked: true;
+                    enabled: false;
+                    active: root.active;
+                    minimum-target: root.target-size;
+                    viewport: root.viewport;
+                }
+            }
+        }
+    }
+}

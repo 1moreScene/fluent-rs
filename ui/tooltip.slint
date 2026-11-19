@@ -1,0 +1,89 @@
+import { OverlayArea, OverlayLayout, OverlayPlacement } from "overlay-placement.slint";
+import { FluentMaterials } from "material.slint";
+import { FluentSurface, FluentText } from "primitives.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+// Place in a visual layer that covers viewport. The owner supplies its input state.
+export component Tooltip {
+    in property <OverlayArea> viewport;
+    in property <OverlayArea> anchor;
+    in property <OverlayPlacement> placement: OverlayPlacement.top;
+    in property <string> text;
+    in property <bool> active: true;
+    in property <bool> hovered;
+    in property <bool> keyboard-focused;
+    in property <bool> pressed;
+    in property <duration> show-delay: FluentMetrics.tooltip-show-delay;
+    in property <duration> visible-duration: FluentMetrics.tooltip-visible-duration;
+    out property <bool> open: root.shown && root.requested && root.panel-bounds.height > 0px && root.panel-bounds.width > 0px;
+    out property <bool> pending: show-timer.running;
+    out property <OverlayArea> panel-bounds: OverlayLayout.place(root.viewport, root.anchor, root.bubble-width,
+        label.preferred-height + FluentMetrics.tooltip-padding-top + FluentMetrics.tooltip-padding-bottom,
+        root.placement, true, FluentMetrics.spacing-medium);
+
+    property <bool> shown;
+    property <bool> requested: root.active && root.text != "" && (root.hovered || root.keyboard-focused);
+    property <length> bubble-width: min(FluentMetrics.tooltip-max-width,
+        max(0px, root.viewport.width - 2 * FluentMetrics.spacing-medium),
+        natural.preferred-width + 2 * FluentMetrics.tooltip-padding-x);
+
+    public function dismiss() {
+        show-timer.stop();
+        hide-timer.stop();
+        root.shown = false;
+    }
+
+    changed requested => {
+        root.dismiss();
+        if (root.requested && !root.pressed) { show-timer.start(); }
+    }
+    changed pressed => { if (root.pressed) { root.dismiss(); } }
+
+    show-timer := Timer {
+        interval: root.show-delay;
+        running: false;
+        triggered => {
+            self.stop();
+            if (root.requested && !root.pressed) {
+                root.shown = true;
+                hide-timer.start();
+            }
+        }
+    }
+    hide-timer := Timer {
+        interval: root.visible-duration;
+        running: false;
+        triggered => { root.dismiss(); }
+    }
+
+    natural := FluentText {
+        visible: false;
+        accessible-role: none;
+        text: root.text;
+        font-size: FluentMetrics.caption-size;
+    }
+
+    FluentSurface {
+        x: root.panel-bounds.x - root.absolute-position.x;
+        y: root.panel-bounds.y - root.absolute-position.y;
+        width: root.panel-bounds.width;
+        height: root.panel-bounds.height;
+        visible: root.open;
+        property <bool> blur: FluentMaterials.in-app-enabled(true);
+        background: blur ? FluentTheme.acrylic-in-app-tint : FluentTheme.acrylic-fallback;
+        border-color: FluentTheme.flyout-stroke;
+        backdrop-blur: blur ? FluentMetrics.acrylic-preview-blur : 0px;
+        clip: true;
+
+        label := FluentText {
+            x: FluentMetrics.tooltip-padding-x;
+            y: FluentMetrics.tooltip-padding-top;
+            width: max(0px, root.bubble-width - 2 * self.x);
+            height: self.preferred-height;
+            text: root.text;
+            font-size: FluentMetrics.caption-size;
+            wrap: word-wrap;
+            accessible-role: none;
+        }
+    }
+}

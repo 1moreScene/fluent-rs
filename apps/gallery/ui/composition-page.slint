@@ -1,0 +1,196 @@
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
+import { Button } from "../../../ui/button.slint";
+import { ItemData } from "../../../ui/item-presenter.slint";
+import { OverlayArea, OverlayHost } from "../../../ui/overlay-host.slint";
+import { FluentText } from "../../../ui/primitives.slint";
+import { ListBox, ListSelectionMode } from "../../../ui/list-box.slint";
+import { FluentMetrics } from "../../../ui/tokens.slint";
+
+export component CompositionPage {
+    in property <[ItemData]> items;
+    in property <bool> active;
+    in property <bool> compact;
+    in property <length> target-size;
+    in property <OverlayArea> viewport;
+    in-out property <ListSelectionMode> selection-mode;
+    in property <bool> list-enabled: true;
+    in property <bool> follows-focus: true;
+    out property <int> selection-edits;
+    public function set-selected-index(index: int) { list.set-selected-index(index); }
+    in-out property <bool> empty;
+    out property <[int]> selected: list.selected;
+    out property <int> focused-row: list.focused-row;
+    out property <length> scroll-offset: list.scroll-offset;
+    out property <length> row-height: list.row-height;
+    out property <Point> list-origin: list.absolute-position;
+    out property <Point> list-scroll-rail: {
+        x: list.absolute-position.x + list.width - FluentMetrics.scroll-bar-size / 2,
+        y: list.absolute-position.y + list.height / 2,
+    };
+    out property <Point> popup-trigger: {
+        x: popup-button.absolute-position.x + popup-button.width / 2,
+        y: popup-button.absolute-position.y + popup-button.height / 2,
+    };
+    out property <Point> modal-trigger: {
+        x: modal-button.absolute-position.x + modal-button.width / 2,
+        y: modal-button.absolute-position.y + modal-button.height / 2,
+    };
+    out property <bool> popup-open: popup.open;
+    out property <bool> modal-open: modal.open;
+    out property <bool> popup-trigger-focused: popup-button.has-focus;
+    out property <bool> modal-trigger-focused: modal-button.has-focus;
+    out property <OverlayArea> popup-bounds: popup.panel-bounds;
+    out property <OverlayArea> modal-bounds: modal.panel-bounds;
+
+    examples-scroll := FluentScrollView {
+        width: 100%;
+        height: 100%;
+        content-height: max(self.height, examples.min-height);
+
+        examples := VerticalLayout {
+            x: 0px;
+            y: 0px;
+            width: examples-scroll.content-width;
+            height: parent.height;
+            spacing: FluentMetrics.spacing-medium;
+
+            FlexboxLayout {
+                spacing: FluentMetrics.spacing-medium;
+                alignment: start;
+
+                Button {
+                    text: root.selection-mode == ListSelectionMode.single ? "Mode: Single"
+                        : root.selection-mode == ListSelectionMode.multiple ? "Mode: Multiple" : "Mode: Extended";
+                    minimum-target: root.target-size;
+                    clicked => {
+                        root.selection-mode = root.selection-mode == ListSelectionMode.single ? ListSelectionMode.multiple
+                            : root.selection-mode == ListSelectionMode.multiple ? ListSelectionMode.extended : ListSelectionMode.single;
+                    }
+                }
+                Button {
+                    text: root.empty ? "Load records" : "Empty list";
+                    minimum-target: root.target-size;
+                    clicked => { root.empty = !root.empty; }
+                }
+            }
+
+            list := ListBox {
+                label: "Records";
+                items: root.empty ? [] : root.items;
+                selection-mode: root.selection-mode;
+                enabled: root.list-enabled;
+                single-selection-follows-focus: root.follows-focus;
+                selection-changed => { root.selection-edits += 1; }
+                minimum-target: root.target-size;
+                vertical-stretch: 1;
+            }
+
+            FlexboxLayout {
+                spacing: root.compact ? FluentMetrics.spacing-small : FluentMetrics.spacing-medium;
+                alignment: start;
+
+                FluentText {
+                    text: root.selected.length + " selected";
+                    vertical-alignment: center;
+                }
+
+                popup-button := Button {
+                    text: "Selection details";
+                    minimum-target: root.target-size;
+                    accessible-expanded: popup.open;
+                    clicked => {
+                        self.focus();
+                        popup.show();
+                    }
+                }
+
+                modal-button := Button {
+                    text: "Clear selection…";
+                    minimum-target: root.target-size;
+                    enabled: root.selected.length > 0;
+                    clicked => {
+                        self.focus();
+                        modal.show();
+                    }
+                }
+            }
+        }
+    }
+
+    popup := OverlayHost {
+        active: root.active;
+        area: root.viewport;
+        anchor: popup-button.absolute-position;
+        anchor-height: popup-button.height;
+        preferred-panel-width: 240px;
+        preferred-panel-height: 126px;
+
+        popup-scroll := FluentScrollView {
+            width: 100%;
+            height: 100%;
+            content-height: max(self.height, popup-content.min-height);
+
+            popup-content := VerticalLayout {
+                x: 0px;
+                y: 0px;
+                width: popup-scroll.content-width;
+                height: parent.height;
+                padding: FluentMetrics.spacing-medium;
+                spacing: FluentMetrics.spacing-medium;
+                alignment: center;
+                FluentText {
+                    text: root.selected.length == 0 ? "No records selected."
+                        : "Selected records: " + root.selected.length;
+                    wrap: word-wrap;
+                }
+                Button {
+                    text: "Close";
+                    minimum-target: root.target-size;
+                    clicked => { popup.dismiss(); }
+                }
+            }
+        }
+    }
+
+    modal := OverlayHost {
+        modal: true;
+        active: root.active;
+        area: root.viewport;
+        preferred-panel-width: 320px;
+        preferred-panel-height: 176px;
+
+        modal-scroll := FluentScrollView {
+            width: 100%;
+            height: 100%;
+            content-height: max(self.height, modal-content.min-height);
+
+            modal-content := VerticalLayout {
+                x: 0px;
+                y: 0px;
+                width: modal-scroll.content-width;
+                height: parent.height;
+                padding: FluentMetrics.spacing-large;
+                spacing: FluentMetrics.spacing-medium;
+                alignment: center;
+                FluentText {
+                    text: "Clear selected records?";
+                    wrap: word-wrap;
+                }
+                Button {
+                    text: "Keep selection";
+                    minimum-target: root.target-size;
+                    clicked => { modal.dismiss(); }
+                }
+                Button {
+                    text: "Clear selection";
+                    minimum-target: root.target-size;
+                    clicked => {
+                        modal.dismiss();
+                        popup-button.focus();
+                        list.clear-selection();
+                    }
+                }
+            }
+        }
+    }
+}

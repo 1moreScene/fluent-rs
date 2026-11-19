@@ -1,0 +1,354 @@
+import { FluentPressable } from "interaction.slint";
+import { ItemAppearance, ItemData } from "item-presenter.slint";
+import { OverlayArea, OverlayHost } from "overlay-host.slint";
+import { OverlayLayout } from "overlay-placement.slint";
+import { FluentIcon, FluentText } from "primitives.slint";
+import { SelectableList } from "selectable-list.slint";
+import { ListDirection, SelectionLogic, SelectionModel } from "selection-model.slint";
+import { TextBox, TextBoxClearSurface } from "text-box.slint";
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+export enum AutoSuggestionTextChangeReason { user-input, suggestion-chosen, programmatic-change }
+
+export global AutoSuggestText {
+    pure callback byte-length(string) -> int;
+}
+
+component SuggestActions inherits Rectangle {
+    in property <bool> enabled: true;
+    in property <bool> query-visible;
+    in property <bool> clear-visible;
+    in property <length> action-width;
+    callback query;
+    callback clear;
+
+    query-button := FluentPressable {
+        x: parent.width - FluentMetrics.suggest-right-margin - self.width;
+        y: 0px;
+        width: root.action-width;
+        height: parent.height;
+        visible: root.query-visible;
+        enabled: root.enabled && root.query-visible;
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+        accessible-role: button;
+        accessible-label: @tr("Submit query");
+        accessible-enabled: self.enabled;
+        accessible-action-default => { if (self.enabled) { root.query(); } }
+        activated => { root.query(); }
+
+        Rectangle {
+            x: FluentMetrics.suggest-query-margin-x;
+            y: (parent.height - FluentMetrics.suggest-query-height) / 2 + FluentMetrics.suggest-query-margin-y;
+            width: max(0px, parent.width - 2 * self.x);
+            height: max(0px, FluentMetrics.suggest-query-height - 2 * FluentMetrics.suggest-query-margin-y);
+            border-radius: FluentMetrics.control-radius;
+            background: FluentTheme.high-contrast && parent.hovered ? FluentTheme.contrast-highlight
+                : parent.pressed ? FluentTheme.subtle-fill-pressed : parent.hovered ? FluentTheme.subtle-fill-hover : transparent;
+            FluentIcon {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: FluentMetrics.text-box-clear-icon-size;
+                height: self.width;
+                viewbox-width: 12;
+                viewbox-height: 12;
+                commands: "M 8.1 8.1 L 11 11 M 9 5 C 9 7.21 7.21 9 5 9 C 2.79 9 1 7.21 1 5 C 1 2.79 2.79 1 5 1 C 7.21 1 9 2.79 9 5";
+                stroke: !root.enabled ? FluentTheme.text-disabled
+                    : FluentTheme.high-contrast && query-button.hovered ? FluentTheme.contrast-highlight-text
+                    : query-button.pressed ? FluentTheme.text-tertiary : FluentTheme.text-secondary;
+                stroke-line-cap: round;
+            }
+        }
+    }
+    clear := FluentPressable {
+        x: parent.width - FluentMetrics.suggest-right-margin - self.width
+            - (root.query-visible ? root.action-width + FluentMetrics.suggest-query-gap : 0px);
+        y: 0px;
+        width: root.action-width;
+        height: parent.height;
+        visible: root.clear-visible;
+        enabled: root.enabled && root.clear-visible;
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+        accessible-role: button;
+        accessible-label: @tr("Clear text");
+        accessible-enabled: self.enabled;
+        accessible-action-default => { if (self.enabled) { root.clear(); } }
+        activated => { root.clear(); }
+        TextBoxClearSurface {
+            width: 100%;
+            height: 100%;
+            right-inset: 0px;
+            hovered: clear.hovered;
+            pressed: clear.pressed;
+        }
+    }
+}
+
+export component AutoSuggestBox inherits FocusScope {
+    in-out property <string> text <=> editor.text;
+    in property <[ItemData]> items;
+    in property <string> header;
+    in property <string> placeholder-text;
+    in property <string> accessible-name: root.header == "" ? root.placeholder-text : root.header;
+    enabled: true;
+    in property <bool> active: true;
+    in property <bool> query-icon;
+    in property <bool> update-text-on-select: true;
+    in property <length> minimum-target;
+    in property <length> max-suggestion-list-height: FluentMetrics.suggest-max-height;
+    in property <OverlayArea> viewport;
+    out property <bool> is-suggestion-list-open: popup.open;
+    out property <bool> editor-focused: editor.has-focus;
+    out property <bool> clear-visible: root.enabled && editor.has-focus && root.text != ""
+        && editor.width > FluentMetrics.text-box-clear-min-width-em * FluentMetrics.scaled-font-size
+            + root.actions-inset;
+    out property <int> highlighted-index: selection.selected-index;
+    out property <OverlayArea> popup-bounds: popup.panel-bounds;
+    out property <OverlayArea> input-bounds: {
+        x: editor.absolute-position.x, y: editor.absolute-position.y,
+        width: editor.width, height: editor.height,
+    };
+    callback text-changed(string, AutoSuggestionTextChangeReason);
+    callback suggestion-chosen(int);
+    callback query-submitted(string, int);
+
+    property <string> last-notified-text;
+    property <string> user-text;
+    property <bool> awaiting-suggestions;
+    property <int> item-count: root.items.length;
+    property <length> action-width: max(root.minimum-target, FluentMetrics.suggest-action-width);
+    property <length> actions-inset: FluentMetrics.suggest-right-margin
+        + (root.query-icon ? root.action-width + FluentMetrics.suggest-query-gap : 0px);
+    property <length> panel-inset: FluentMetrics.control-stroke + FluentMetrics.suggest-panel-padding;
+    property <OverlayArea> geometry: OverlayLayout.adjoin(root.viewport, root.input-bounds,
+        min(root.max-suggestion-list-height, root.items.length * FluentMetrics.list-row-height(root.minimum-target))
+            + 2 * root.panel-inset);
+    property <bool> opens-above: root.geometry.y < root.input-bounds.y;
+
+    min-width: FluentMetrics.text-box-min-width;
+    min-height: content.min-height;
+    preferred-height: content.preferred-height;
+    vertical-stretch: 0;
+    forward-focus: editor;
+    focus-on-click: false;
+    focus-on-tab-navigation: false;
+    accessible-role: combobox;
+    accessible-label: root.accessible-name;
+    accessible-value: root.text;
+    accessible-enabled: root.enabled;
+    accessible-expandable: root.items.length > 0;
+    accessible-expanded: root.is-suggestion-list-open;
+    accessible-action-expand => { root.show-suggestions(); }
+
+    selection := SelectionModel { items: root.items; }
+
+    function notify-text(reason: AutoSuggestionTextChangeReason) {
+        if (root.text != root.last-notified-text) {
+            root.last-notified-text = root.text;
+            root.text-changed(root.text, reason);
+        }
+    }
+    function write-text(value: string, reason: AutoSuggestionTextChangeReason) {
+        root.text = value;
+        root.notify-text(reason);
+        let end = AutoSuggestText.byte-length(root.text);
+        editor.set-selection-offsets(end, end);
+    }
+    changed text => {
+        if (root.text != root.last-notified-text) {
+            selection.clear();
+            root.notify-text(AutoSuggestionTextChangeReason.programmatic-change);
+        }
+    }
+    changed items => { selection.clear(); root.refresh(); }
+    changed item-count => { selection.clear(); root.refresh(); }
+    changed active => { if (!root.active) { root.dismiss-suggestions(); } }
+    changed enabled => { if (!root.enabled) { root.dismiss-suggestions(); } }
+    changed editor-focused => { if (!root.editor-focused && popup.open) { root.dismiss-suggestions(); } }
+
+    public function show-suggestions() {
+        root.awaiting-suggestions = true;
+        if (root.enabled && root.active && root.items.length > 0 && root.max-suggestion-list-height > 0px) {
+            editor.focus();
+            popup.show();
+            editor.focus();
+        }
+    }
+    public function dismiss-suggestions() {
+        root.awaiting-suggestions = false;
+        popup.dismiss();
+    }
+    public function select-all() { editor.select-all(); }
+
+    function refresh() {
+        if (root.items.length == 0) { popup.dismiss(); }
+        else if ((root.awaiting-suggestions && editor.has-focus) || popup.open) { root.show-suggestions(); }
+    }
+    function edit(value: string) {
+        selection.clear();
+        root.user-text = value;
+        root.awaiting-suggestions = true;
+        root.notify-text(AutoSuggestionTextChangeReason.user-input);
+        root.refresh();
+    }
+    function choose(index: int) {
+        if (selection.enabled(index) && selection.selected-index != index) {
+            selection.set-index(index);
+            if (root.update-text-on-select) {
+                root.write-text(root.items[index].text, AutoSuggestionTextChangeReason.suggestion-chosen);
+            }
+            root.suggestion-chosen(index);
+        }
+    }
+    function submit(index: int) {
+        if (!root.enabled || !root.active || editor.preedit-text != "") { return; }
+        let value = root.text;
+        root.awaiting-suggestions = false;
+        if (index < 0) { selection.clear(); }
+        root.query-submitted(value, index);
+        root.dismiss-suggestions();
+        selection.clear();
+        if (root.enabled && root.active) { editor.focus(); }
+    }
+    function clear-text() {
+        if (root.clear-visible) {
+            root.text = "";
+            editor.set-selection-offsets(0, 0);
+            editor.focus();
+            root.edit("");
+        }
+    }
+    function input-key(event: KeyEvent) -> EventResult {
+        if (!root.enabled || !root.active || editor.preedit-text != "") { return reject; }
+        if (event.text == Key.Return) {
+            if (!event.repeat) { root.submit(popup.open ? selection.selected-index : -1); }
+            return accept;
+        }
+        if (event.text == Key.Escape || ((event.text == Key.Tab || event.text == Key.Backtab) && popup.open)) {
+            root.write-text(root.user-text, AutoSuggestionTextChangeReason.programmatic-change);
+            root.dismiss-suggestions();
+            selection.clear();
+            editor.focus();
+            return event.text == Key.Escape ? accept : reject;
+        }
+        if (popup.open && !event.modifiers.alt && (event.text == Key.DownArrow || event.text == Key.UpArrow)) {
+            let first = SelectionLogic.target(root.items, -1, ListDirection.first);
+            let last = SelectionLogic.target(root.items, -1, ListDirection.last);
+            if (first != last || selection.selected-index < 0) {
+                let next = SelectionLogic.target(root.items, selection.selected-index,
+                    event.text == Key.DownArrow ? ListDirection.next
+                        : selection.selected-index < 0 ? ListDirection.last : ListDirection.previous);
+                if (next >= 0) { root.choose(next); }
+                else {
+                    selection.clear();
+                    root.write-text(root.user-text, AutoSuggestionTextChangeReason.programmatic-change);
+                }
+            }
+            return accept;
+        }
+        return reject;
+    }
+    capture-key-pressed(event) => { return root.input-key(event); }
+
+    content := VerticalLayout {
+        width: 100%;
+        height: 100%;
+        spacing: FluentMetrics.spacing-medium;
+        if root.header != "" : FluentText {
+            text: root.header;
+            color: root.enabled ? FluentTheme.text-primary : FluentTheme.text-disabled;
+            wrap: word-wrap;
+            accessible-role: none;
+        }
+        Rectangle {
+            min-height: editor.min-height;
+            preferred-height: self.min-height;
+            vertical-stretch: 0;
+            editor := TextBox {
+                width: 100%;
+                height: 100%;
+                enabled: root.enabled && root.active;
+                accessible-name: root.accessible-name;
+                placeholder-text: root.placeholder-text;
+                minimum-target: root.minimum-target;
+                show-clear-button: false;
+                trailing-inset: FluentMetrics.text-box-padding-right + FluentMetrics.control-stroke
+                    + root.actions-inset + (root.clear-visible ? root.action-width : 0px);
+                square-top: popup.open && root.opens-above;
+                square-bottom: popup.open && !root.opens-above;
+                edited(value) => { root.edit(value); }
+            }
+            SuggestActions {
+                width: 100%;
+                height: 100%;
+                visible: !popup.open;
+                enabled: root.enabled && root.active;
+                clear-visible: root.clear-visible;
+                query-visible: root.query-icon;
+                action-width: root.action-width;
+                query => { root.submit(-1); }
+                clear => { root.clear-text(); }
+            }
+        }
+    }
+
+    popup := OverlayHost {
+        area: root.viewport;
+        anchor: { x: root.input-bounds.x, y: root.input-bounds.y };
+        anchor-width: root.input-bounds.width;
+        anchor-height: root.input-bounds.height;
+        positioned-panel: root.geometry;
+        use-positioned-panel: true;
+        clip-content: false;
+        active: root.enabled && root.active && root.items.length > 0 && root.max-suggestion-list-height > 0px;
+        acrylic: true;
+        focus-scope-on-open: false;
+        dismiss-on-escape: false;
+        outside-pressed => { root.awaiting-suggestions = false; }
+        square-top: !root.opens-above;
+        square-bottom: root.opens-above;
+        scrim-fill: transparent;
+        changed open => {
+            if (!self.open) { selection.clear(); }
+            else { editor.focus(); }
+        }
+        FocusScope {
+            width: popup.panel-bounds.width;
+            height: popup.panel-bounds.height;
+            focus-on-click: false;
+            focus-on-tab-navigation: false;
+            capture-key-pressed(event) => { return root.input-key(event); }
+            SelectableList {
+                x: 0px;
+                y: root.panel-inset;
+                width: parent.width;
+                height: max(0px, parent.height - 2 * self.y);
+                items: root.items;
+                selected: selection.selected;
+                preview-index: popup.open ? max(0, selection.selected-index) : -1;
+                framed: false;
+                focus-on-tab-navigation: false;
+                item-appearance: ItemAppearance.suggestion;
+                minimum-target: root.minimum-target;
+                label: root.accessible-name;
+                row-activated(index, from, control, shift, keyboard) => {
+                    root.choose(index);
+                    root.submit(index);
+                }
+            }
+            SuggestActions {
+                x: root.input-bounds.x - popup.panel-bounds.x;
+                y: root.input-bounds.y - popup.panel-bounds.y;
+                width: root.input-bounds.width;
+                height: root.input-bounds.height;
+                enabled: root.enabled && root.active;
+                clear-visible: root.clear-visible;
+                query-visible: root.query-icon;
+                action-width: root.action-width;
+                query => { root.submit(-1); }
+                clear => { root.clear-text(); }
+            }
+        }
+    }
+}

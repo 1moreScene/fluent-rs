@@ -1,3 +1,4 @@
+import { FluentScrollView } from "../../../ui/scroll-view.slint";
 import { ButtonState } from "../../../ui/interaction.slint";
 import { FluentText } from "../../../ui/primitives.slint";
 import { RadioButton, RadioButtonSurface } from "../../../ui/radio-button.slint";
@@ -5,7 +6,7 @@ import { RadioGroup } from "../../../ui/radio-group.slint";
 import { FluentMetrics } from "../../../ui/tokens.slint";
 import { Caption } from "caption.slint";
 
-export component RadioPage inherits Flickable {
+export component RadioPage inherits FluentScrollView {
     in property <length> target-size;
     in property <int> max-columns: 3;
     in-out property <int> profile-selection <=> profiles.selected-index;
@@ -24,12 +25,13 @@ export component RadioPage inherits Flickable {
     out property <ButtonState> standalone-state: standalone.state;
     out property <length> standalone-height: standalone.height;
 
-    content-width: self.width;
     content-height: max(self.height, page.preferred-height);
     mouse-drag-pan-enabled: false;
 
     page := VerticalLayout {
-        width: parent.width;
+        x: 0px;
+        y: 0px;
+        width: root.content-width;
         height: self.preferred-height;
         padding-left: FluentMetrics.spacing-medium;
         padding-right: self.padding-left;

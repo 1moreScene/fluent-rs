@@ -1,0 +1,58 @@
+import { FluentScrollBar } from "scroll-bar.slint";
+import { FluentMetrics } from "tokens.slint";
+
+export component FluentScrollView inherits Rectangle {
+    in property <length> content-width: max(0px, self.width - (self.vertical-scrollbar ? FluentMetrics.scroll-bar-size : 0px));
+    in property <length> content-height: self.height;
+    in property <bool> mouse-drag-pan-enabled: true;
+    in property <bool> vertical-scrollbar: true;
+    in property <bool> horizontal-scrollbar;
+    in property <length> vertical-line-step: FluentMetrics.scaled-font-size;
+    in property <length> horizontal-line-step: FluentMetrics.scaled-font-size;
+    out property <length> horizontal-offset: -viewport.content-x;
+    out property <length> vertical-offset: -viewport.content-y;
+
+    public function scroll-to(position: Point, behavior: ScrollBehavior) {
+        viewport.scroll-to(position, behavior);
+    }
+
+    viewport := Flickable {
+        // Keep the native wheel and touch input area under the scrollbar.
+        width: 100%;
+        height: 100%;
+        content-width: max(self.width, root.content-width);
+        content-height: root.content-height;
+        mouse-drag-pan-enabled: root.mouse-drag-pan-enabled;
+
+        Rectangle {
+            x: 0px;
+            y: 0px;
+            width: root.content-width;
+            height: root.content-height;
+            @children
+        }
+    }
+
+    if root.vertical-scrollbar : FluentScrollBar {
+        x: max(0px, parent.width - self.width);
+        y: 0px;
+        height: parent.height;
+        extent: viewport.content-height;
+        viewport-size: viewport.height;
+        offset: -viewport.content-y;
+        line-step: root.vertical-line-step;
+        offset-requested(y) => { viewport.scroll-to({ x: -viewport.content-x, y: y }, ScrollBehavior.instant); }
+    }
+    if root.horizontal-scrollbar : FluentScrollBar {
+        x: 0px;
+        y: max(0px, parent.height - self.height);
+        width: parent.width;
+        height: FluentMetrics.scroll-bar-size;
+        horizontal: true;
+        extent: viewport.content-width;
+        viewport-size: viewport.width;
+        offset: -viewport.content-x;
+        line-step: root.horizontal-line-step;
+        offset-requested(x) => { viewport.scroll-to({ x: x, y: -viewport.content-y }, ScrollBehavior.instant); }
+    }
+}

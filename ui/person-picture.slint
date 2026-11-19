@@ -1,0 +1,90 @@
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+import { FluentText } from "primitives.slint";
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+
+export enum PersonPictureState { person, initials, photo, group }
+export global PersonPictureLogic {
+    in-out property <bool> ready;
+    pure callback initials(string) -> string;
+}
+
+export component PersonPicture inherits Rectangle {
+    in property <bool> enabled:true;
+    in property <length> size: FluentMetrics.person-size;
+    in property <string> display-name;
+    in property <string> initials;
+    in property <image> profile-picture;
+    in property <bool> is-group;
+    in property <int> badge-number;
+    in property <string> badge-glyph;
+    in property <image> badge-image-source;
+    in property <string> badge-text;
+    out property <string> actual-initials: root.initials != "" ? root.initials
+        : PersonPictureLogic.ready ? PersonPictureLogic.initials(root.display-name) : "";
+    out property <PersonPictureState> state: root.is-group ? PersonPictureState.group
+        : root.profile-picture.width > 0 ? PersonPictureState.photo
+        : root.actual-initials != "" ? PersonPictureState.initials : PersonPictureState.person;
+    out property <length> diameter: min(root.width,root.height);
+    out property <length> initials-size: max(1px,root.diameter * FluentMetrics.person-initials-ratio);
+    out property <length> badge-size: root.diameter * FluentMetrics.person-badge-ratio;
+    out property <bool> badge-visible: root.badge-image-source.width > 0 || root.badge-number > 0
+        || (root.badge-number == 0 && root.badge-glyph != "");
+    out property <string> badge-label: root.badge-number > 99 ? "99+" : root.badge-number > 0 ? root.badge-number : root.badge-glyph;
+    in property <string> accessible-name: root.person-label + (root.badge-number > 0
+        ? ", " + root.badge-number + " " + (root.badge-text != "" ? root.badge-text : root.badge-number == 1 ? @tr("item") : @tr("items"))
+        : root.badge-glyph != "" || root.badge-image-source.width > 0 ? ", " + (root.badge-text != "" ? root.badge-text : @tr("icon")) : "");
+    property <string> person-label: root.is-group ? @tr("Group") : root.display-name != "" ? root.display-name
+        : root.initials != "" ? root.initials : @tr("Person");
+    property <color> foreground: FluentTheme.text-primary;
+    property <color> badge-foreground: FluentTheme.high-contrast ? FluentTheme.contrast-button-text : FluentTheme.accent-text;
+
+    width:root.size; height:self.width;
+    preferred-width:root.size; preferred-height:root.size;
+    horizontal-stretch:0; vertical-stretch:0;
+    accessible-role:text;
+    accessible-label:root.accessible-name;
+    accessible-enabled:root.enabled;
+
+    avatar := Rectangle {
+        width:root.diameter; height:root.diameter;
+        x:(parent.width - self.width)/2; y:(parent.height - self.height)/2;
+        border-radius:self.width/2;
+        background:FluentTheme.high-contrast ? FluentTheme.contrast-highlight-text : FluentTheme.control-alt-fill-pressed;
+        border-width:FluentMetrics.control-stroke;
+        border-color:FluentTheme.card-stroke;
+        if root.state == PersonPictureState.initials : FluentText {
+            width:100%; height:100%; text:root.actual-initials;
+            font-size:root.initials-size; font-weight:FluentMetrics.strong-weight;
+            color:root.foreground; horizontal-alignment:center; vertical-alignment:center;
+            accessible-role:none;
+        }
+        if root.state == PersonPictureState.person || root.state == PersonPictureState.group : FluentSystemIcon {
+            width:root.initials-size; height:self.width;
+            x:(parent.width - self.width)/2; y:(parent.height - self.height)/2;
+            source:root.is-group ? @image-url("icons/fluent/people-20-regular.svg") : @image-url("icons/fluent/person-20-regular.svg");
+            foreground:root.foreground;
+        }
+        if root.state == PersonPictureState.photo : Rectangle {
+            width:100%; height:100%; border-radius:self.width/2; clip:true;
+            Image { width:100%; height:100%; source:root.profile-picture; image-fit:cover; accessible-role:none; }
+        }
+    }
+    if root.badge-visible : Rectangle {
+        x:avatar.x + avatar.width - self.width + FluentMetrics.person-badge-outset;
+        y:avatar.y - FluentMetrics.person-badge-outset;
+        width:root.badge-size; height:self.width; border-radius:self.width/2;
+        background:FluentTheme.high-contrast ? FluentTheme.contrast-button-face : FluentTheme.accent-fill;
+        border-width:FluentMetrics.person-badge-stroke;
+        border-color:FluentTheme.high-contrast ? FluentTheme.contrast-button-text : transparent;
+        if root.badge-image-source.width > 0 : Rectangle {
+            width:100%; height:100%; border-radius:self.width/2; clip:true;
+            Image { width:100%; height:100%; source:root.badge-image-source; image-fit:cover; accessible-role:none; }
+        }
+        if root.badge-image-source.width == 0 : FluentText {
+            width:100%; height:100%; text:root.badge-label;
+            font-size:max(1px, root.badge-size * FluentMetrics.person-badge-font-ratio);
+            font-weight:FluentMetrics.strong-weight; color:root.badge-foreground;
+            horizontal-alignment:center; vertical-alignment:center; accessible-role:none;
+        }
+    }
+}

@@ -1,0 +1,24 @@
+import { FluentMetrics, FluentTheme } from "tokens.slint";
+
+// The backing texture stays in the renderer; pointer handling does not read it back.
+export component FluentLiveAcrylic inherits Rectangle {
+    background: FluentTheme.acrylic-luminosity;
+    backdrop-blur: FluentMetrics.in-app-acrylic-blur;
+    clip: true;
+    accessible-role: none;
+
+    if FluentTheme.acrylic-color-tint.alpha > 0 : Rectangle {
+        width: 100%;
+        height: 100%;
+        background: FluentTheme.acrylic-color-tint;
+    }
+    Image {
+        width: 100%;
+        height: 100%;
+        source: @image-url("materials/acrylic-noise.png");
+        horizontal-tiling: repeat;
+        vertical-tiling: repeat;
+        opacity: 0.02;
+        accessible-role: none;
+    }
+}

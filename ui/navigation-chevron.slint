@@ -1,0 +1,35 @@
+import { AnimatedIcon, AnimationMarker } from "animated-icon.slint";
+import { FluentSystemIcon } from "fluent-system-icon.slint";
+import { FluentMetrics } from "tokens.slint";
+
+export struct ChevronPose { x: float, y: float, rotation: float }
+
+export global ChevronAnimation {
+    in property <[AnimationMarker]> markers;
+    in property <duration> source-duration;
+    pure callback pose(float) -> ChevronPose;
+}
+
+export component NavigationChevron inherits AnimatedIcon {
+    in property <bool> expanded;
+    in property <bool> hovered;
+    in property <bool> pressed;
+    width: FluentMetrics.navigation-top-padding;
+    height: self.width;
+    state: (root.pressed ? "Pressed" : root.hovered ? "PointerOver" : "Normal") + (root.expanded ? "On" : "Off");
+    markers: ChevronAnimation.markers;
+    source-duration: ChevronAnimation.source-duration;
+    fallback-icon: @image-url("icons/fluent/chevron-down-12-regular.svg");
+
+    if root.source-available : FluentSystemIcon {
+        property <ChevronPose> pose: ChevronAnimation.pose(root.progress);
+        width: 100%;
+        height: 100%;
+        x: (pose.x / 48 - 0.5) * root.width;
+        y: (pose.y / 48 - 0.5) * root.height;
+        transform-origin: { x: self.width / 2, y: self.height / 2 };
+        transform-rotation: pose.rotation * 1deg;
+        source: @image-url("icons/fluent/chevron-down-12-regular.svg");
+        foreground: root.foreground;
+    }
+}

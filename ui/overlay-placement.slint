@@ -1,0 +1,84 @@
+import { FluentMetrics } from "tokens.slint";
+
+export struct OverlayArea { x: length, y: length, width: length, height: length }
+export enum OverlayPlacement { bottom, top, left, right }
+
+export global OverlayLayout {
+    // CommandBar uses the visible window width on narrow hosts and docks to the expanded bar.
+    public pure function command-overflow(viewport: OverlayArea, bar: OverlayArea,
+        closed-height: length, width: length, natural-height: length) -> OverlayArea {
+        let viewport-right = viewport.x + max(0px, viewport.width);
+        let viewport-bottom = viewport.y + max(0px, viewport.height);
+        let w = clamp(width, 0px, max(0px, viewport.width));
+        let h = clamp(natural-height, 0px, max(0px, viewport.height) / 2);
+        let right-aligned = bar.x + bar.width - w;
+        let aligned-x = right-aligned >= viewport.x ? right-aligned
+            : bar.x + w <= viewport-right ? bar.x : viewport.x;
+        let x = clamp(aligned-x, viewport.x, viewport-right - w);
+        let bottom = clamp(bar.y + bar.height, viewport.y, viewport-bottom);
+        let top = clamp(bar.y + min(0px, closed-height - bar.height), viewport.y, viewport-bottom);
+        let above = top - viewport.y;
+        let below = viewport-bottom - bottom;
+        let opens-up = below < h && above > 0px;
+        let height = min(h, opens-up ? above : below);
+        return { x: x, y: opens-up ? top - height : bottom, width: w, height: height };
+    }
+
+    // AutoSuggestBox maximizes the side with more room and meets the editor edge.
+    public pure function adjoin(viewport: OverlayArea, anchor: OverlayArea,
+        preferred-height: length) -> OverlayArea {
+        let bottom = viewport.y + max(0px, viewport.height);
+        let top-edge = clamp(anchor.y, viewport.y, bottom);
+        let bottom-edge = clamp(anchor.y + anchor.height, top-edge, bottom);
+        let above = top-edge - viewport.y;
+        let below = bottom - bottom-edge;
+        let open-above = above >= below;
+        let height = max(0px, min(preferred-height, open-above ? above : below));
+        let width = max(0px, min(anchor.width, viewport.width));
+        return {
+            x: clamp(anchor.x, viewport.x, viewport.x + max(0px, viewport.width) - width),
+            y: open-above ? top-edge - height : bottom-edge,
+            width: width, height: height,
+        };
+    }
+
+    // Rectangles and anchors are in window-local coordinates. Place on the opposite side
+    // when it has room for more of the panel, and cap the panel to the remaining space.
+    public pure function place(viewport: OverlayArea, anchor: OverlayArea, width: length,
+        height: length, preferred: OverlayPlacement, center: bool, gap: length) -> OverlayArea {
+        return self.place-with-inset(viewport, anchor, width, height, preferred, center, gap, FluentMetrics.spacing-medium);
+    }
+
+    public pure function place-with-inset(viewport: OverlayArea, anchor: OverlayArea, width: length,
+        height: length, preferred: OverlayPlacement, center: bool, gap: length, viewport-inset: length) -> OverlayArea {
+        let inset = max(0px, viewport-inset);
+        let left = viewport.x + min(inset, viewport.width / 2);
+        let top = viewport.y + min(inset, viewport.height / 2);
+        let right = viewport.x + viewport.width - min(inset, viewport.width / 2);
+        let bottom = viewport.y + viewport.height - min(inset, viewport.height / 2);
+        let anchor-left = clamp(anchor.x, left, right);
+        let anchor-right = clamp(anchor.x + anchor.width, left, right);
+        let anchor-top = clamp(anchor.y, top, bottom);
+        let anchor-bottom = clamp(anchor.y + anchor.height, top, bottom);
+        let horizontal = preferred == OverlayPlacement.left || preferred == OverlayPlacement.right;
+        let before = preferred == OverlayPlacement.left || preferred == OverlayPlacement.top;
+        let preceding = max(0px, (horizontal ? anchor-left - left : anchor-top - top) - gap);
+        let following = max(0px, (horizontal ? right - anchor-right : bottom - anchor-bottom) - gap);
+        let desired = horizontal ? width : height;
+        let available = before ? preceding : following;
+        let use-preferred = available >= desired || available >= (before ? following : preceding);
+        let place-before = use-preferred ? before : !before;
+        let axis = place-before ? preceding : following;
+        let w = min(width, horizontal ? axis : right - left);
+        let h = min(height, horizontal ? bottom - top : axis);
+        let aligned-x = center ? anchor.x + (anchor.width - w) / 2 : anchor.x;
+        let aligned-y = center ? anchor.y + (anchor.height - h) / 2 : anchor.y;
+        return {
+            x: horizontal ? (place-before ? anchor-left - gap - w : anchor-right + gap)
+                : clamp(aligned-x, left, right - w),
+            y: horizontal ? clamp(aligned-y, top, bottom - h)
+                : (place-before ? anchor-top - gap - h : anchor-bottom + gap),
+            width: w, height: h,
+        };
+    }
+}
